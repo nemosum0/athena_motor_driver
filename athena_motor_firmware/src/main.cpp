@@ -131,6 +131,9 @@ void loop()
       app.motor_controller.setVelocityFeedForwardGains(
           command.left_velocity_feed_forward_k_v, command.left_velocity_feed_forward_k_s,
           command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s );
+      motor_controller.setRotationalFeedForwardGains(
+          command.left_velocity_feed_forward_k_s_rotational,
+          command.right_velocity_feed_forward_k_s_rotational );
 
       app.motor_controller.setPositionFeedForwardGains( 0.0f, 0.0f, 0.0f, 0.0f );
       app.time_since_last_command = 0;

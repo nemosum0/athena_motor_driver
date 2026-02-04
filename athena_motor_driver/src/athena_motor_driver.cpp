@@ -155,6 +155,9 @@ void AthenaMotorDriver::update()
       command.left_velocity_feed_forward_k_s = left_velocity_feed_forward_k_s_;
       command.right_velocity_feed_forward_k_v = right_velocity_feed_forward_k_v_;
       command.right_velocity_feed_forward_k_s = right_velocity_feed_forward_k_s_;
+      command.left_velocity_feed_forward_k_s_rotational = left_velocity_feed_forward_k_s_rotational_;
+      command.right_velocity_feed_forward_k_s_rotational =
+          right_velocity_feed_forward_k_s_rotational_;
       auto result = cross_talker_->sendObject( command );
       if ( result == crosstalk::WriteResult::Success ) {
         RCLCPP_INFO( get_logger(), "Sending request to update PID Gains." );
@@ -169,9 +172,11 @@ void AthenaMotorDriver::update()
                      left_position_pid_gains_.k_d, right_position_pid_gains_.k_p,
                      right_position_pid_gains_.k_i, right_position_pid_gains_.k_d );
         RCLCPP_INFO( get_logger(),
-                     "Velocity Feed-Forward:\n  Left: k_v=%f, k_s=%f\n  Right: k_v=%f, k_s=%f",
+                     "Velocity Feed-Forward:\n  Left: k_v=%f, k_s=%f, k_s_rotational=%f\n  Right: "
+                     "k_v=%f, k_s=%f, k_s_rotational=%f",
                      left_velocity_feed_forward_k_v_, left_velocity_feed_forward_k_s_,
-                     right_velocity_feed_forward_k_v_, right_velocity_feed_forward_k_s_ );
+                     left_velocity_feed_forward_k_s_rotational_, right_velocity_feed_forward_k_v_,
+                     right_velocity_feed_forward_k_s_, right_velocity_feed_forward_k_s_rotational_ );
         RCLCPP_INFO( get_logger(), "You should see 'PID Gains updated.' next, if it worked." );
 
       } else {
@@ -396,6 +401,14 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter( "right_velocity_feed_forward.k_s",
                                     std::ref( right_velocity_feed_forward_k_s_ ),
                                     "Right velocity feed-forward static friction gain", pid_options );
+  declare_reconfigurable_parameter( "left_velocity_feed_forward.k_s_rotational",
+                                    std::ref( left_velocity_feed_forward_k_s_rotational_ ),
+                                    "Left velocity feed-forward rotational static friction gain",
+                                    pid_options );
+  declare_reconfigurable_parameter( "right_velocity_feed_forward.k_s_rotational",
+                                    std::ref( right_velocity_feed_forward_k_s_rotational_ ),
+                                    "Right velocity feed-forward rotational static friction gain",
+                                    pid_options );
 }
 
 } // namespace athena_motor_driver

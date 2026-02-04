@@ -87,6 +87,8 @@ struct ChangePIDGainsCommand {
   float left_velocity_feed_forward_k_s = 0.0f;
   float right_velocity_feed_forward_k_v = 0.0f;
   float right_velocity_feed_forward_k_s = 0.0f;
+  float left_velocity_feed_forward_k_s_rotational = 0.0f;
+  float right_velocity_feed_forward_k_s_rotational = 0.0f;
 
   ChangePIDGainsCommand() = default;
 
@@ -106,7 +108,9 @@ REFL_AUTO( type( ChangePIDGainsCommand, crosstalk::id( 3 ) ), field( left_veloci
            field( right_velocity_pid_gains ), field( left_position_pid_gains ),
            field( right_position_pid_gains ), field( left_velocity_feed_forward_k_v ),
            field( left_velocity_feed_forward_k_s ), field( right_velocity_feed_forward_k_v ),
-           field( right_velocity_feed_forward_k_s ) )
+           field( right_velocity_feed_forward_k_s ),
+           field( left_velocity_feed_forward_k_s_rotational ),
+           field( right_velocity_feed_forward_k_s_rotational ) )
 
 struct MotorStatus {
   enum class Error : uint8_t {
