@@ -3,23 +3,23 @@
     port_name: "/dev/tty_drive_motor_controller"
     enable_debug: true
     wheel_separation: 1.248
-    rotational_amplification: 6.4
+    rotational_amplification: 4.0
     wheel_radius: 0.075
-    left_velocity_pid.k_p: 1.0
+    left_velocity_pid.k_p: 5.0
     left_velocity_pid.k_i: 0.0
     left_velocity_pid.k_d: 0.0
-    right_velocity_pid.k_p: 1.0
+    right_velocity_pid.k_p: 5.0
     right_velocity_pid.k_i: 0.0
     right_velocity_pid.k_d: 0.0
-    left_position_pid.k_p: 0.0
+    left_position_pid.k_p: 5.0
     left_position_pid.k_i: 0.0
     left_position_pid.k_d: 0.0
-    right_position_pid.k_p: 0.0
+    right_position_pid.k_p: 5.0
     right_position_pid.k_i: 0.0
     right_position_pid.k_d: 0.0
-    left_velocity_feed_forward.k_v: 0.7
+    left_velocity_feed_forward.k_v: 0.3
     left_velocity_feed_forward.k_s: 0.8
-    left_velocity_feed_forward.k_s_rotational: 3.0
-    right_velocity_feed_forward.k_v: 0.7
+    left_velocity_feed_forward.k_s_rotational: 2.0
+    right_velocity_feed_forward.k_v: 0.3
     right_velocity_feed_forward.k_s: 0.8
-    right_velocity_feed_forward.k_s_rotational: 3.0
+    right_velocity_feed_forward.k_s_rotational: 2.0
