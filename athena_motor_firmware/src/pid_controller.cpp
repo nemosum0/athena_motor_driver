@@ -62,8 +62,9 @@ float PIDController::computeTorque( float goal, float current )
     output += feed_forward;
   }
 
+  const float max_output_change = max_output_change_ * dt;
+  output = constrain( output, last_output_ - max_output_change, last_output_ + max_output_change );
   output = constrain( output, min_output_, max_output_ );
-  output = constrain( output, last_output_ - max_output_change_, last_output_ + max_output_change_ );
 
   last_input_ = current;
   last_error_ = error;

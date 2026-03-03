@@ -1,3 +1,5 @@
+#pragma once
+
 #include "motor_msg_A1B1.h"
 #include <HardwareSerial.h>
 #include <vector>

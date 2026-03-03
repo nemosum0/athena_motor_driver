@@ -1,13 +1,9 @@
 #pragma once
 
 #include "athena_motor_interface/athena_motor_interfaces.h"
-#include "math/mean_filter.h"
-#include <cmath>
-#include <elapsedMillis.h>
 
 class PositionMeasurementFilter
 {
-  static constexpr int WINDOW_SIZE = 50; // Number of measurements to consider for filtering
 public:
   void addMeasurements( const MotorStatus &front, const MotorStatus &rear );
 
@@ -25,16 +21,9 @@ public:
 private:
   float computeNormalizedPosition( float position, float offset ) const;
 
-  struct Measurement {
-    elapsedMicros timestamp;
-    float position;
-  };
-
   float position_ = 0;
   float front_offset_ = 0;
   float rear_offset_ = 0;
-  float last_front_measurement_;
-  float last_rear_measurement_;
   bool front_initialized_ = false;
   bool rear_initialized_ = false;
   static constexpr float LOWER_END = -176.756729;
@@ -72,7 +61,7 @@ inline void PositionMeasurementFilter::addMeasurements( const MotorStatus &front
   }
   if ( rear.valid && rear_initialized_ ) {
     if ( rear.position < LOWER_END || rear.position > UPPER_END ) {
-      Serial.printf( "New extreme rear position: %f\n", front.position );
+      Serial.printf( "New extreme rear position: %f\n", rear.position );
       return;
     }
     new_position += computeNormalizedPosition( rear.position, rear_offset_ );

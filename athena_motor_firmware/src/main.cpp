@@ -30,8 +30,8 @@ void setup()
   delay( 20 );
   Serial.begin( BAUD_RATE );
   auto front_comm = std::make_shared<MotorComm>( &Serial1, 2 );
-  auto back_comm = std::make_shared<MotorComm>( &Serial2, 9 );
-  motor_controller.init( front_comm, back_comm );
+  auto rear_comm = std::make_shared<MotorComm>( &Serial2, 9 );
+  motor_controller.init( front_comm, rear_comm );
   // motor_timer.priority( 0 );
   // motor_timer.begin( motorControlLoop, 1000 );
   motor_timer.begin( motorControlLoop, MAIN_LOOP_DELAY_IN_US );
@@ -89,6 +89,21 @@ void loop()
       if ( host_comm.readObject( command ) != crosstalk::ReadResult::Success ) {
         break;
       }
+      Serial.printf( "Received new velocity PID gains: left kP=%.3f, kI=%.3f, kD=%.3f; right "
+                     "kP=%.3f, kI=%.3f, kD=%.3f\n",
+                     command.left_velocity_pid_gains.k_p, command.left_velocity_pid_gains.k_i,
+                     command.left_velocity_pid_gains.k_d, command.right_velocity_pid_gains.k_p,
+                     command.right_velocity_pid_gains.k_i, command.right_velocity_pid_gains.k_d );
+      Serial.printf( "Received new position PID gains: left kP=%.3f, kI=%.3f, kD=%.3f; right "
+                     "kP=%.3f, kI=%.3f, kD=%.3f\n",
+                     command.left_position_pid_gains.k_p, command.left_position_pid_gains.k_i,
+                     command.left_position_pid_gains.k_d, command.right_position_pid_gains.k_p,
+                     command.right_position_pid_gains.k_i, command.right_position_pid_gains.k_d );
+      Serial.printf(
+          "Received new velocity feed-forward gains: left kV=%.3f, kS=%.3f; right kV=%.3f, "
+          "kS=%.3f\n",
+          command.left_velocity_feed_forward_k_v, command.left_velocity_feed_forward_k_s,
+          command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s );
       motor_controller.setVelocityPIDGains( command.left_velocity_pid_gains,
                                             command.right_velocity_pid_gains );
       motor_controller.setPositionPIDGains( command.left_position_pid_gains,

@@ -5,12 +5,10 @@
 #include <cmath>
 #include <elapsedMillis.h>
 
-const float MAX_PLAUSIBLE_VELOCITY_CHANGE = 3.0;
-const float MAX_PLAUSIBLE_POSITION_CHANGE = 0.35; // In rad, corresponds to 20 degrees
-
 class VelocityMeasurementFilter
 {
   static constexpr int WINDOW_SIZE = 50; // Number of measurements to consider for filtering
+  static constexpr float MAX_PLAUSIBLE_POSITION_CHANGE = 0.35f; // In rad, corresponds to 20 degrees
 public:
   void addMeasurements( const MotorStatus &front, const MotorStatus &rear );
 
