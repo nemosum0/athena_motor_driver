@@ -122,10 +122,14 @@ void MotorSideController::setPositionFeedForwardGains( float k_v, float k_s )
 
 float MotorSideController::validFrontFreq( long age_ms ) const
 {
+  if ( age_ms == 0 )
+    return 0;
   return front_valid_.getSum() * 1000.0f / age_ms;
 }
 
 float MotorSideController::validRearFreq( long age_ms ) const
 {
+  if ( age_ms == 0 )
+    return 0;
   return rear_valid_.getSum() * 1000.0f / age_ms;
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arduino.h>
 #include <elapsedMillis.h>
 
 class ThrottlePrinter
@@ -18,5 +19,5 @@ public:
 private:
   unsigned long print_interval_ms_;
   // Start with a long elapsed time so the first message is printed immediately
-  elapsedMillis elapsed_time_ { 100000 };
+  elapsedMillis elapsed_time_{ 100000 };
 };

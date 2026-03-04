@@ -3,6 +3,8 @@
 #include "motor_comm.h"
 #include "throttle_printer.hpp"
 
+#include <algorithm>
+
 MotorController::MotorController() { }
 
 MotorController::~MotorController() = default;
@@ -225,7 +227,7 @@ void MotorController::assembleMotorStatus( const MotorCommCommand &left_command,
 void MotorController::collectDebugData()
 {
   status_ages_.push( elapsedMillis() );
-  long status_age_ms = status_ages_.front();
+  long status_age_ms = std::max<long>( 1, status_ages_.front() ); // Avoid 0ms from first call.
   debug_data_.status.freq_front_left = left_.validFrontFreq( status_age_ms );
   debug_data_.status.freq_front_right = right_.validFrontFreq( status_age_ms );
   debug_data_.status.freq_rear_left = left_.validRearFreq( status_age_ms );

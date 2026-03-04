@@ -3,6 +3,8 @@
 #include "athena_motor_interface/athena_motor_interfaces.h"
 #include "config.h"
 
+#include <Arduino.h>
+
 class PositionMeasurementFilter
 {
 public:

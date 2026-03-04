@@ -41,7 +41,9 @@ void motorControlLoop()
     app.status_led.speed = StatusLED::SLOW;
   }
   app.full_motor_status = app.motor_controller.update();
+  noInterrupts();
   app.average_loop_time_filter.addValue( loop_timer );
+  interrupts();
 }
 
 void setup()
@@ -163,7 +165,9 @@ void loop()
   }
   if ( app.enable_debug ) {
     auto debug_data = app.motor_controller.debugData();
+    noInterrupts();
     debug_data.average_loop_time_us = app.average_loop_time_filter.getMean();
+    interrupts();
     app.host_comm.sendObject( debug_data );
   }
   app.status_led.update();
