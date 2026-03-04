@@ -122,15 +122,16 @@ MotorController::Torque MotorController::computeTorque()
   }
 
   // Detect rotation: wheels moving in opposite directions (or one moving, one still)
-  const bool is_rotating =
-      ( velocity_.left * velocity_.right < 0 ) ||
-      ( std::abs( velocity_.left ) > 0.1f && std::abs( velocity_.right ) < 0.1f ) ||
-      ( std::abs( velocity_.right ) > 0.1f && std::abs( velocity_.left ) < 0.1f );
+  const bool is_rotating = ( velocity_.left * velocity_.right < 0 ) ||
+                           ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE &&
+                             std::abs( velocity_.right ) < VELOCITY_DEAD_ZONE ) ||
+                           ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE &&
+                             std::abs( velocity_.left ) < VELOCITY_DEAD_ZONE );
 
   if ( is_rotating ) {
-    if ( std::abs( velocity_.left ) > 0.1f )
+    if ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE )
       left_torque += std::copysign( rotational_feed_forward_k_s_left_, velocity_.left );
-    if ( std::abs( velocity_.right ) > 0.1f )
+    if ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE )
       right_torque += std::copysign( rotational_feed_forward_k_s_right_, velocity_.right );
   }
 
