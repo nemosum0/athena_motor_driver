@@ -172,6 +172,7 @@ void AthenaMotorDriver::update()
                      "Velocity Feed-Forward:\n  Left: k_v=%f, k_s=%f\n  Right: k_v=%f, k_s=%f",
                      left_velocity_feed_forward_k_v_, left_velocity_feed_forward_k_s_,
                      right_velocity_feed_forward_k_v_, right_velocity_feed_forward_k_s_ );
+        RCLCPP_INFO( get_logger(), "You should see 'PID Gains updated.' next, if it worked." );
 
       } else {
         RCLCPP_ERROR_STREAM( get_logger(), "Failed to send ChangePIDGainsCommand object. Error:"
@@ -186,7 +187,7 @@ void AthenaMotorDriver::update()
       if ( cross_talker_->available() > 0 ) {
         buffer.resize( cross_talker_->available() );
         size_t bytes_read = cross_talker_->read( buffer.data(), buffer.size() );
-        std::cout << std::string( (const char *)buffer.data(), bytes_read ) << std::endl;
+        RCLCPP_INFO_STREAM( get_logger(), "Read " << bytes_read << " bytes of non-object data from serial port: "<< std::string( (const char *)buffer.data(), bytes_read ) );
       }
       cross_talker_->processSerialData( false );
 
@@ -298,7 +299,7 @@ void AthenaMotorDriver::update()
 
 void AthenaMotorDriver::setupController( const std::string &controller_type )
 {
-  auto node = std::shared_ptr<rclcpp::Node>( this, []( const rclcpp::Node * ) {} );
+  auto node = std::shared_ptr<rclcpp::Node>( this, []( const rclcpp::Node * ) { } );
   if ( controller_type == "diff_drive" ) {
     controller_ = std::make_shared<DiffDriveController>( node );
   }

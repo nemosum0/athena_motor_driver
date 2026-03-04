@@ -7,6 +7,11 @@
 class PIDController
 {
 public:
+  /*
+   * @param max_output Maximum torque output (Nm). This should be set to the maximum torque you want to allow the controller to command.
+   * @param max_output_change Maximum change in output (Nm/s). This is used to limit acceleration and prevent
+   *          sudden jumps in torque which can cause mechanical stress and instability.
+   */
   PIDController( float kp, float ki, float kd, float min_output, float max_output,
                  float max_output_change );
   void setGains( float kp, float ki, float kd );

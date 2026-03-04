@@ -1,4 +1,5 @@
 #include "pid_controller.h"
+#include "config.h"
 
 PIDController::PIDController( float kp, float ki, float kd, float min_output, float max_output,
                               float max_output_change )
@@ -56,14 +57,15 @@ float PIDController::computeTorque( float goal, float current )
   // Formula: feed_forward = (target_velocity * k_v) + (sign(target_velocity) * k_s)
   // k_v: Velocity gain - proportional to target velocity
   // k_s: Static friction gain - constant "push" to overcome static friction (only when velocity != 0)
-  if ( std::abs( goal ) > 0.1 ) {
+  if ( std::abs( goal ) > FEED_FORWARD_DEAD_ZONE ) {
     float feed_forward = goal * feed_forward_k_v_;
     feed_forward += std::copysign( feed_forward_k_s_, goal );
     output += feed_forward;
   }
 
+  const float max_output_change = max_output_change_ * dt;
+  output = constrain( output, last_output_ - max_output_change, last_output_ + max_output_change );
   output = constrain( output, min_output_, max_output_ );
-  output = constrain( output, last_output_ - max_output_change_, last_output_ + max_output_change_ );
 
   last_input_ = current;
   last_error_ = error;
