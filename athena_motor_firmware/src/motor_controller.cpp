@@ -1,7 +1,7 @@
 #include "motor_controller.h"
+#include "config.h"
 #include "motor_comm.h"
 #include "throttle_printer.hpp"
-#include "config.h"
 
 MotorController::MotorController() { }
 
@@ -51,6 +51,23 @@ void MotorController::stop()
   target_velocity_.right = 0;
 }
 
+namespace
+{
+bool isAccelerating( float target_velocity, float current_velocity )
+{
+  return std::signbit( target_velocity ) == std::signbit( current_velocity ) &&
+         std::abs( target_velocity ) > std::abs( current_velocity );
+}
+
+float limitVelocityChange( float target_velocity, float current_velocity, float max_velocity_change )
+{
+  if ( std::abs( target_velocity - current_velocity ) <= max_velocity_change ) {
+    return target_velocity;
+  }
+  return current_velocity + std::copysign( max_velocity_change, target_velocity - current_velocity );
+}
+} // namespace
+
 MotorController::Torque MotorController::computeTorque()
 {
   if ( !initialized_position_ ) {
@@ -63,34 +80,22 @@ MotorController::Torque MotorController::computeTorque()
   }
   target_velocity_.left = command_.left;
   target_velocity_.right = -command_.right;
-  long elapsed_micros = time_since_last_command_;
-  time_since_last_command_ = 0;
   // Limit acceleration
   // Really simple ramp up and faster ramp down for breaking
   float acceleration = MAX_DECELERATION;
-  if ( std::signbit( target_velocity_.left ) == std::signbit( velocity_.left ) &&
-       std::abs( target_velocity_.left ) > std::abs( velocity_.left ) ) {
-    acceleration = MAX_ACCELERATION;
-  }
-  if ( std::signbit( target_velocity_.right ) == std::signbit( velocity_.right ) &&
-       std::abs( target_velocity_.right ) > std::abs( velocity_.right ) ) {
+  if ( isAccelerating( target_velocity_.left, velocity_.left ) ||
+       isAccelerating( target_velocity_.right, velocity_.right ) ) {
     acceleration = MAX_ACCELERATION;
   }
 
+  // Cap elapsed time to 30 ms to avoid large jumps after long delays
+  long elapsed_micros = std::min<long>( time_since_last_command_, 30'000 );
   const float max_velocity_change = acceleration * elapsed_micros / 1E6f;
 
-  if ( const float velocity_change = target_velocity_.left - velocity_.left;
-       std::abs( velocity_change ) < max_velocity_change ) {
-    velocity_.left = target_velocity_.left;
-  } else {
-    velocity_.left += std::copysign( max_velocity_change, velocity_change );
-  }
-  if ( const float velocity_change = target_velocity_.right - velocity_.right;
-       std::abs( velocity_change ) < max_velocity_change ) {
-    velocity_.right = target_velocity_.right;
-  } else {
-    velocity_.right += std::copysign( max_velocity_change, velocity_change );
-  }
+  velocity_.left = limitVelocityChange( target_velocity_.left, velocity_.left, max_velocity_change );
+  velocity_.right =
+      limitVelocityChange( target_velocity_.right, velocity_.right, max_velocity_change );
+
   if ( disable_acceleration_limiting_ ) {
     // If acceleration limits are disabled, we just set the target velocity directly
     // This is useful for tuning the PID controller but should not be used in normal operation
@@ -121,13 +126,10 @@ static void setCommandFromTorque( MotorCommCommand &command, float torque )
   }
 }
 
-const FullMotorStatus &MotorController::update()
+void MotorController::computeMotorCommands( MotorCommCommand &left_command,
+                                            MotorCommCommand &right_command )
 {
-  debug_data_.error = MotorDebugData::Error::NO_ERROR;
-
-  MotorCommCommand left_command;
   left_command.motor_id = 0;
-  MotorCommCommand right_command;
   right_command.motor_id = 1;
   const bool left_working = left_.isWorking( MOTOR_STATUS_TIMEOUT_MS );
   const bool right_working = right_.isWorking( MOTOR_STATUS_TIMEOUT_MS );
@@ -147,54 +149,54 @@ const FullMotorStatus &MotorController::update()
     setCommandFromTorque( left_command, initialized_position_ ? torque.left : 0 );
     setCommandFromTorque( right_command, initialized_position_ ? torque.right : 0 );
   }
+  time_since_last_command_ = 0;
+}
 
-  const bool front_working =
-      left_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
-  const bool rear_working =
-      left_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
-  constexpr int MAX_RESET_SKIP_COUNT = 10;
-
+void MotorController::sendReceiveBus( std::shared_ptr<MotorComm> &comm, int &reset_skip_count,
+                                      const MotorCommCommand &left_command,
+                                      const MotorCommCommand &right_command, bool bus_working,
+                                      bool is_front )
+{
   MotorCommStatus left_status;
   MotorCommStatus right_status;
-  if ( front_working || ++reset_skip_count_front_ > MAX_RESET_SKIP_COUNT ) {
-    // When communication fails, try to skip commands for a few cycles so if motor comm is
+  if ( bus_working || ++reset_skip_count > MAX_RESET_SKIP_COUNT ) {
+    // When communication fails, skip commands for a few cycles so if motor comm is
     // misaligned it has time to recover
-    reset_skip_count_front_ = 0;
-    front_motor_comm_->sendReceive( left_command, right_command, left_status, right_status );
+    reset_skip_count = 0;
+    comm->sendReceive( left_command, right_command, left_status, right_status );
   } else {
-    front_motor_comm_->resetComm();
+    comm->resetComm();
   }
-  left_.updateFrontStatus( left_status, 0 );
-  right_.updateFrontStatus( right_status, 1 );
 
-  left_status = {};
-  right_status = {};
-  if ( rear_working || ++reset_skip_count_rear_ > MAX_RESET_SKIP_COUNT ) {
-    reset_skip_count_rear_ = 0;
-    rear_motor_comm_->sendReceive( left_command, right_command, left_status, right_status );
+  if ( is_front ) {
+    left_.updateFrontStatus( left_status, 0 );
+    right_.updateFrontStatus( right_status, 1 );
   } else {
-    rear_motor_comm_->resetComm();
+    left_.updateRearStatus( left_status, 0 );
+    right_.updateRearStatus( right_status, 1 );
   }
-  left_.updateRearStatus( left_status, 0 );
-  right_.updateRearStatus( right_status, 1 );
+}
 
-  // Commands transmitted, check if we got a valid position measurement to initialize position if not already done
-  if ( !initialized_position_ ) {
-    left_.resetPositionFilter();
-    right_.resetPositionFilter();
-    // If at least one motor on each bus is valid, we can initialize the position
-    const bool front_has_valid = left_.frontStatus().valid || right_.frontStatus().valid;
-    const bool rear_has_valid = left_.rearStatus().valid || right_.rearStatus().valid;
-    if ( front_has_valid && rear_has_valid ) {
-      initialized_position_ = true;
-      left_.initializePosition();
-      right_.initializePosition();
-    }
+void MotorController::tryInitializePosition()
+{
+  if ( initialized_position_ )
+    return;
+
+  left_.resetPositionFilter();
+  right_.resetPositionFilter();
+  // If at least one motor on each bus is valid, we can initialize the position
+  const bool front_has_valid = left_.frontStatus().valid || right_.frontStatus().valid;
+  const bool rear_has_valid = left_.rearStatus().valid || right_.rearStatus().valid;
+  if ( front_has_valid && rear_has_valid ) {
+    initialized_position_ = true;
+    left_.initializePosition();
+    right_.initializePosition();
   }
-  left_.addMeasurements();
-  right_.addMeasurements();
+}
 
-  // Assemble full motor status
+void MotorController::assembleMotorStatus( const MotorCommCommand &left_command,
+                                           const MotorCommCommand &right_command )
+{
   motor_status_.front_left = left_.frontStatus();
   motor_status_.front_right = right_.frontStatus();
   motor_status_.rear_left = left_.rearStatus();
@@ -218,7 +220,10 @@ const FullMotorStatus &MotorController::update()
   motor_status_.front_right.age_ms = right_.frontAgeMs();
   motor_status_.rear_left.age_ms = left_.rearAgeMs();
   motor_status_.rear_right.age_ms = right_.rearAgeMs();
+}
 
+void MotorController::collectDebugData()
+{
   status_ages_.push( elapsedMillis() );
   long status_age_ms = status_ages_.front();
   debug_data_.status.freq_front_left = left_.validFrontFreq( status_age_ms );
@@ -229,5 +234,32 @@ const FullMotorStatus &MotorController::update()
   debug_data_.right_velocity_pid = right_.velocityPIDDebugData();
   debug_data_.left_position_pid = left_.positionPIDDebugData();
   debug_data_.right_position_pid = right_.positionPIDDebugData();
+}
+
+const FullMotorStatus &MotorController::update()
+{
+  debug_data_.error = MotorDebugData::Error::NO_ERROR;
+
+  MotorCommCommand left_command;
+  MotorCommCommand right_command;
+  computeMotorCommands( left_command, right_command );
+
+  const bool front_working =
+      left_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
+  const bool rear_working =
+      left_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
+
+  sendReceiveBus( front_motor_comm_, reset_skip_count_front_, left_command, right_command,
+                  front_working, true );
+  sendReceiveBus( rear_motor_comm_, reset_skip_count_rear_, left_command, right_command,
+                  rear_working, false );
+
+  tryInitializePosition();
+  left_.addMeasurements();
+  right_.addMeasurements();
+
+  assembleMotorStatus( left_command, right_command );
+  collectDebugData();
+
   return motor_status_;
 }

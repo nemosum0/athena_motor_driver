@@ -3,17 +3,16 @@
 #include <Arduino.h>
 
 #include "athena_motor_interface/athena_motor_interfaces.h"
+#include "config.h"
 #include "math/ring_buffer.h"
+#include "motor_comm.h"
 #include "motor_side_controller.h"
 #include <memory>
-
-class MotorComm;
 
 class MotorController
 {
 public:
-  // Min torque to issue movement command rather than brake
-  static constexpr float MIN_TORQUE = 0.5f;
+  static constexpr float MIN_TORQUE = MIN_TORQUE_FOR_FOC;
 
   MotorController();
 
@@ -27,11 +26,9 @@ public:
 
   void setVelocityPIDGains( const PIDGains &left_pid_gains, const PIDGains &right_pid_gains );
 
-  void setVelocityFeedForwardGains( float left_k_v, float left_k_s, float right_k_v,
-                                    float right_k_s );
+  void setVelocityFeedForwardGains( float left_k_v, float left_k_s, float right_k_v, float right_k_s );
 
-  void setPositionFeedForwardGains( float left_k_v, float left_k_s, float right_k_v,
-                                    float right_k_s );
+  void setPositionFeedForwardGains( float left_k_v, float left_k_s, float right_k_v, float right_k_s );
 
   void setDisableAccelerationLimiting( bool disable ) { disable_acceleration_limiting_ = disable; }
 
@@ -43,18 +40,11 @@ public:
 
   MotorComm &rearComm() { return *rear_motor_comm_; }
 
-  MotorError::Error getError() const
-  {
-    return static_cast<MotorError::Error>( debug_data_.error );
-  }
+  MotorError::Error getError() const { return static_cast<MotorError::Error>( debug_data_.error ); }
 
   const MotorDebugData &debugData() const { return debug_data_; }
 
 private:
-  // In m/s^2. To reach 1U/s=2*pi rad/s in 0.5 seconds, acceleration would be 2m/s^2
-  static constexpr float MAX_ACCELERATION = 8.0f;
-  static constexpr float MAX_DECELERATION = 24.0f;
-
   struct Torque {
     float left = 0;
     float right = 0;
@@ -65,6 +55,14 @@ private:
   };
 
   Torque computeTorque();
+  void computeMotorCommands( MotorCommCommand &left_command, MotorCommCommand &right_command );
+  void sendReceiveBus( std::shared_ptr<MotorComm> &comm, int &reset_skip_count,
+                       const MotorCommCommand &left_command, const MotorCommCommand &right_command,
+                       bool bus_working, bool is_front );
+  void tryInitializePosition();
+  void assembleMotorStatus( const MotorCommCommand &left_command,
+                            const MotorCommCommand &right_command );
+  void collectDebugData();
 
   struct Velocity {
     float left = 0;
@@ -76,7 +74,7 @@ private:
   Velocity velocity_;
   elapsedMicros time_since_last_command_ = 0;
 
-  RingBuffer<elapsedMillis, 50> status_ages_;
+  RingBuffer<elapsedMillis, STATUS_AGE_BUFFER_SIZE> status_ages_;
   MotorDebugData debug_data_;
 
   MotorSideController left_;

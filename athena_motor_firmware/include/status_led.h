@@ -1,10 +1,11 @@
 #pragma once
 
+#include "config.h"
 #include <Arduino.h>
+#include <elapsedMillis.h>
 
-// LED
 struct StatusLED {
-  enum Speed { SLOW = 1000, FAST = 200 };
+  enum Speed { SLOW = LED_SLOW_BLINK_MS, FAST = LED_FAST_BLINK_MS };
 
   StatusLED( int pin ) : led_pin_( pin ) { pinMode( pin, OUTPUT ); }
 
@@ -18,8 +19,7 @@ struct StatusLED {
   }
 
   int led_pin_;
-  int led_counter = 0;
   elapsedMillis last_toggle;
   bool last_led_state = false;
   Speed speed = SLOW;
-} status_led( LED_BUILTIN );
+};

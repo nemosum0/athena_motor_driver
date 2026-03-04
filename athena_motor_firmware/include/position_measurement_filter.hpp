@@ -1,6 +1,7 @@
 #pragma once
 
 #include "athena_motor_interface/athena_motor_interfaces.h"
+#include "config.h"
 
 class PositionMeasurementFilter
 {
@@ -26,8 +27,8 @@ private:
   float rear_offset_ = 0;
   bool front_initialized_ = false;
   bool rear_initialized_ = false;
-  static constexpr float LOWER_END = -176.756729;
-  static constexpr float UPPER_END = 176.724319;
+  static constexpr float LOWER_END = POSITION_LOWER_END;
+  static constexpr float UPPER_END = POSITION_UPPER_END;
   static constexpr float POSITION_RANGE = UPPER_END - LOWER_END;
 };
 

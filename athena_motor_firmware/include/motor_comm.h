@@ -66,4 +66,9 @@ private:
   uint8_t send_buffer_[4 * sizeof( MasterComdDataV3 )];
   uint8_t receive_buffer_[256];
   uint8_t status_buffer_[78];
+  float torque_scale_ = 0.f;
+  float velocity_scale_ = 0.f;
+  float position_scale_ = 0.f;
+  float kp_scale_ = 0.f;
+  float kw_scale_ = 0.f;
 };

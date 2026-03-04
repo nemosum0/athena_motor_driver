@@ -1,6 +1,7 @@
 #pragma once
 
 #include "athena_motor_interface/athena_motor_interfaces.h"
+#include "config.h"
 #include "math/mean_filter.h"
 #include "pid_controller.h"
 #include "position_measurement_filter.hpp"
@@ -48,20 +49,26 @@ public:
 
   // --- Accessors ---
   float filteredVelocity() const { return velocity_filter_.getFiltered(); }
+
   const MotorStatus &frontStatus() const { return front_status_; }
+
   const MotorStatus &rearStatus() const { return rear_status_; }
+
   unsigned long frontAgeMs() const { return front_age_; }
+
   unsigned long rearAgeMs() const { return rear_age_; }
 
   // --- Debug ---
   const PIDDebugData &velocityPIDDebugData() const { return velocity_pid_.debugData(); }
+
   const PIDDebugData &positionPIDDebugData() const { return position_pid_.debugData(); }
+
   float validFrontFreq( long age_ms ) const;
   float validRearFreq( long age_ms ) const;
 
 private:
   void updateStatus( const MotorCommStatus &status, uint8_t expected_motor_id,
-                     MotorStatus &out_status, MeanFilter<uint8_t, 50> &valid_filter,
+                     MotorStatus &out_status, MeanFilter<uint8_t, VALID_FILTER_SIZE> &valid_filter,
                      elapsedMillis &age );
 
   enum class ControlMode { POSITION, VELOCITY };
@@ -70,8 +77,8 @@ private:
   MotorStatus rear_status_;
   elapsedMillis front_age_;
   elapsedMillis rear_age_;
-  MeanFilter<uint8_t, 50> front_valid_;
-  MeanFilter<uint8_t, 50> rear_valid_;
+  MeanFilter<uint8_t, VALID_FILTER_SIZE> front_valid_;
+  MeanFilter<uint8_t, VALID_FILTER_SIZE> rear_valid_;
 
   PositionMeasurementFilter position_filter_;
   VelocityMeasurementFilter velocity_filter_;

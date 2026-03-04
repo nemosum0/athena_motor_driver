@@ -37,7 +37,8 @@ MotorSideController::MotorSideController()
 
 void MotorSideController::updateStatus( const MotorCommStatus &status, uint8_t expected_motor_id,
                                         MotorStatus &out_status,
-                                        MeanFilter<uint8_t, 50> &valid_filter, elapsedMillis &age )
+                                        MeanFilter<uint8_t, VALID_FILTER_SIZE> &valid_filter,
+                                        elapsedMillis &age )
 {
   out_status = toMotorStatus( status );
   out_status.valid &= status.motor_id == expected_motor_id;
@@ -74,7 +75,7 @@ void MotorSideController::initializePosition() { hold_position_ = position_filte
 
 float MotorSideController::computeTorque( float target_velocity )
 {
-  if ( std::abs( target_velocity ) < 0.1f ) {
+  if ( std::abs( target_velocity ) < VELOCITY_DEAD_ZONE ) {
     if ( control_mode_ != ControlMode::POSITION ) {
       control_mode_ = ControlMode::POSITION;
       position_filter_.reset();
