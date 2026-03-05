@@ -137,8 +137,9 @@ void AthenaMotorDriver::update()
       result = cross_talker_->sendObject( last_motor_command_ );
     } else if ( twist_msg_ ) {
       is_moving_ = true;
-      MotorCommand command =
-          controller_->computeMotorCommand( twist_msg_->linear.x, twist_msg_->angular.z );
+      const double direction_sign = invert_forward_direction_ ? -1.0 : 1.0;
+      MotorCommand command = controller_->computeMotorCommand(
+          direction_sign * twist_msg_->linear.x, direction_sign * twist_msg_->angular.z );
       RCLCPP_DEBUG( get_logger(), "Sending velocities: %f, %f", command.left, command.right );
       result = cross_talker_->sendObject( command );
     }
@@ -192,7 +193,9 @@ void AthenaMotorDriver::update()
       if ( cross_talker_->available() > 0 ) {
         buffer.resize( cross_talker_->available() );
         size_t bytes_read = cross_talker_->read( buffer.data(), buffer.size() );
-        RCLCPP_INFO_STREAM( get_logger(), "Read " << bytes_read << " bytes of non-object data from serial port: "<< std::string( (const char *)buffer.data(), bytes_read ) );
+        RCLCPP_INFO_STREAM( get_logger(),
+                            "Read " << bytes_read << " bytes of non-object data from serial port: "
+                                    << std::string( (const char *)buffer.data(), bytes_read ) );
       }
       cross_talker_->processSerialData( false );
 
@@ -304,7 +307,7 @@ void AthenaMotorDriver::update()
 
 void AthenaMotorDriver::setupController( const std::string &controller_type )
 {
-  auto node = std::shared_ptr<rclcpp::Node>( this, []( const rclcpp::Node * ) { } );
+  auto node = std::shared_ptr<rclcpp::Node>( this, []( const rclcpp::Node * ) {} );
   if ( controller_type == "diff_drive" ) {
     controller_ = std::make_shared<DiffDriveController>( node );
   }
@@ -351,6 +354,8 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter(
       "enable_torque_mode", std::ref( torque_mode_ ),
       "Use torque commands instead of velocity commands (ignores cmd_vel topic when active)" );
+  declare_reconfigurable_parameter( "invert_forward_direction", std::ref( invert_forward_direction_ ),
+                                    "Invert the forward direction of the robot" );
   hector::ParameterOptions<float> pid_options =
       hector::ParameterOptions<float>()
           .onValidate( []( const auto &value ) { return value >= 0; } )

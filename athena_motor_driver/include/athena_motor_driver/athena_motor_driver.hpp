@@ -79,6 +79,7 @@ private:
   bool disable_acceleration_limiting_ = false;
   bool torque_mode_ = false;
   bool is_moving_ = false;
+  bool invert_forward_direction_ = false;
 };
 
 } // namespace athena_motor_driver

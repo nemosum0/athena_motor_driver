@@ -23,3 +23,4 @@
     right_velocity_feed_forward.k_v: 0.3
     right_velocity_feed_forward.k_s: 0.8
     right_velocity_feed_forward.k_s_rotational: 2.0
+    invert_forward_direction: true
