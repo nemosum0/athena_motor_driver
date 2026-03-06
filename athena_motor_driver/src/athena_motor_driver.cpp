@@ -138,8 +138,8 @@ void AthenaMotorDriver::update()
     } else if ( twist_msg_ ) {
       is_moving_ = true;
       const double direction_sign = invert_forward_direction_ ? -1.0 : 1.0;
-      MotorCommand command = controller_->computeMotorCommand(
-          direction_sign * twist_msg_->linear.x, direction_sign * twist_msg_->angular.z );
+      MotorCommand command = controller_->computeMotorCommand( direction_sign * twist_msg_->linear.x,
+                                                               twist_msg_->angular.z );
       RCLCPP_DEBUG( get_logger(), "Sending velocities: %f, %f", command.left, command.right );
       result = cross_talker_->sendObject( command );
     }
