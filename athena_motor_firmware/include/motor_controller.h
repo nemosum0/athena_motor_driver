@@ -30,6 +30,8 @@ public:
 
   void setPositionFeedForwardGains( float left_k_v, float left_k_s, float right_k_v, float right_k_s );
 
+  void setRotationalFeedForwardGains( float left_k_s, float right_k_s );
+
   void setDisableAccelerationLimiting( bool disable ) { disable_acceleration_limiting_ = disable; }
 
   void stop();
@@ -87,4 +89,6 @@ private:
   int reset_skip_count_rear_ = 0;
   bool disable_acceleration_limiting_ = false; // For tuning PID controller
   bool initialized_position_ = false;
+  float rotational_feed_forward_k_s_left_ = 0.0f;
+  float rotational_feed_forward_k_s_right_ = 0.0f;
 };

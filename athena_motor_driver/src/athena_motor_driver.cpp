@@ -137,8 +137,9 @@ void AthenaMotorDriver::update()
       result = cross_talker_->sendObject( last_motor_command_ );
     } else if ( twist_msg_ ) {
       is_moving_ = true;
-      MotorCommand command =
-          controller_->computeMotorCommand( twist_msg_->linear.x, twist_msg_->angular.z );
+      const double direction_sign = invert_forward_direction_ ? -1.0 : 1.0;
+      MotorCommand command = controller_->computeMotorCommand( direction_sign * twist_msg_->linear.x,
+                                                               twist_msg_->angular.z );
       RCLCPP_DEBUG( get_logger(), "Sending velocities: %f, %f", command.left, command.right );
       result = cross_talker_->sendObject( command );
     }
@@ -155,6 +156,9 @@ void AthenaMotorDriver::update()
       command.left_velocity_feed_forward_k_s = left_velocity_feed_forward_k_s_;
       command.right_velocity_feed_forward_k_v = right_velocity_feed_forward_k_v_;
       command.right_velocity_feed_forward_k_s = right_velocity_feed_forward_k_s_;
+      command.left_velocity_feed_forward_k_s_rotational = left_velocity_feed_forward_k_s_rotational_;
+      command.right_velocity_feed_forward_k_s_rotational =
+          right_velocity_feed_forward_k_s_rotational_;
       auto result = cross_talker_->sendObject( command );
       if ( result == crosstalk::WriteResult::Success ) {
         RCLCPP_INFO( get_logger(), "Sending request to update PID Gains." );
@@ -169,9 +173,11 @@ void AthenaMotorDriver::update()
                      left_position_pid_gains_.k_d, right_position_pid_gains_.k_p,
                      right_position_pid_gains_.k_i, right_position_pid_gains_.k_d );
         RCLCPP_INFO( get_logger(),
-                     "Velocity Feed-Forward:\n  Left: k_v=%f, k_s=%f\n  Right: k_v=%f, k_s=%f",
+                     "Velocity Feed-Forward:\n  Left: k_v=%f, k_s=%f, k_s_rotational=%f\n  Right: "
+                     "k_v=%f, k_s=%f, k_s_rotational=%f",
                      left_velocity_feed_forward_k_v_, left_velocity_feed_forward_k_s_,
-                     right_velocity_feed_forward_k_v_, right_velocity_feed_forward_k_s_ );
+                     left_velocity_feed_forward_k_s_rotational_, right_velocity_feed_forward_k_v_,
+                     right_velocity_feed_forward_k_s_, right_velocity_feed_forward_k_s_rotational_ );
         RCLCPP_INFO( get_logger(), "You should see 'PID Gains updated.' next, if it worked." );
 
       } else {
@@ -187,7 +193,9 @@ void AthenaMotorDriver::update()
       if ( cross_talker_->available() > 0 ) {
         buffer.resize( cross_talker_->available() );
         size_t bytes_read = cross_talker_->read( buffer.data(), buffer.size() );
-        RCLCPP_INFO_STREAM( get_logger(), "Read " << bytes_read << " bytes of non-object data from serial port: "<< std::string( (const char *)buffer.data(), bytes_read ) );
+        RCLCPP_INFO_STREAM( get_logger(),
+                            "Read " << bytes_read << " bytes of non-object data from serial port: "
+                                    << std::string( (const char *)buffer.data(), bytes_read ) );
       }
       cross_talker_->processSerialData( false );
 
@@ -299,7 +307,7 @@ void AthenaMotorDriver::update()
 
 void AthenaMotorDriver::setupController( const std::string &controller_type )
 {
-  auto node = std::shared_ptr<rclcpp::Node>( this, []( const rclcpp::Node * ) { } );
+  auto node = std::shared_ptr<rclcpp::Node>( this, []( const rclcpp::Node * ) {} );
   if ( controller_type == "diff_drive" ) {
     controller_ = std::make_shared<DiffDriveController>( node );
   }
@@ -346,6 +354,8 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter(
       "enable_torque_mode", std::ref( torque_mode_ ),
       "Use torque commands instead of velocity commands (ignores cmd_vel topic when active)" );
+  declare_reconfigurable_parameter( "invert_forward_direction", std::ref( invert_forward_direction_ ),
+                                    "Invert the forward direction of the robot" );
   hector::ParameterOptions<float> pid_options =
       hector::ParameterOptions<float>()
           .onValidate( []( const auto &value ) { return value >= 0; } )
@@ -396,6 +406,14 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter( "right_velocity_feed_forward.k_s",
                                     std::ref( right_velocity_feed_forward_k_s_ ),
                                     "Right velocity feed-forward static friction gain", pid_options );
+  declare_reconfigurable_parameter( "left_velocity_feed_forward.k_s_rotational",
+                                    std::ref( left_velocity_feed_forward_k_s_rotational_ ),
+                                    "Left velocity feed-forward rotational static friction gain",
+                                    pid_options );
+  declare_reconfigurable_parameter( "right_velocity_feed_forward.k_s_rotational",
+                                    std::ref( right_velocity_feed_forward_k_s_rotational_ ),
+                                    "Right velocity feed-forward rotational static friction gain",
+                                    pid_options );
 }
 
 } // namespace athena_motor_driver

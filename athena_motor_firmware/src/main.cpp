@@ -120,10 +120,12 @@ void loop()
                      command.left_position_pid_gains.k_d, command.right_position_pid_gains.k_p,
                      command.right_position_pid_gains.k_i, command.right_position_pid_gains.k_d );
       Serial.printf(
-          "Received new velocity feed-forward gains: left kV=%.3f, kS=%.3f; right kV=%.3f, "
-          "kS=%.3f\n",
+          "Received new velocity feed-forward gains: left kV=%.3f, kS=%.3f, kS_rot=%.3f; right "
+          "kV=%.3f, kS=%.3f, kS_rot=%.3f\n",
           command.left_velocity_feed_forward_k_v, command.left_velocity_feed_forward_k_s,
-          command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s );
+          command.left_velocity_feed_forward_k_s_rotational,
+          command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s,
+          command.right_velocity_feed_forward_k_s_rotational );
       app.motor_controller.setVelocityPIDGains( command.left_velocity_pid_gains,
                                                 command.right_velocity_pid_gains );
       app.motor_controller.setPositionPIDGains( command.left_position_pid_gains,
@@ -131,6 +133,9 @@ void loop()
       app.motor_controller.setVelocityFeedForwardGains(
           command.left_velocity_feed_forward_k_v, command.left_velocity_feed_forward_k_s,
           command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s );
+      app.motor_controller.setRotationalFeedForwardGains(
+          command.left_velocity_feed_forward_k_s_rotational,
+          command.right_velocity_feed_forward_k_s_rotational );
 
       app.motor_controller.setPositionFeedForwardGains( 0.0f, 0.0f, 0.0f, 0.0f );
       app.time_since_last_command = 0;

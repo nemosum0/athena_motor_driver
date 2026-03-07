@@ -46,6 +46,12 @@ void MotorController::setPositionFeedForwardGains( float left_k_v, float left_k_
   right_.setPositionFeedForwardGains( right_k_v, right_k_s );
 }
 
+void MotorController::setRotationalFeedForwardGains( float left_k_s, float right_k_s )
+{
+  rotational_feed_forward_k_s_left_ = left_k_s;
+  rotational_feed_forward_k_s_right_ = right_k_s;
+}
+
 void MotorController::stop()
 {
   command_ = MotorCommand();
@@ -114,6 +120,21 @@ MotorController::Torque MotorController::computeTorque()
     left_torque = 0;
     right_torque = 0;
   }
+
+  // Detect rotation: wheels moving in opposite directions (or one moving, one still)
+  const bool is_rotating = ( velocity_.left * velocity_.right < 0 ) ||
+                           ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE &&
+                             std::abs( velocity_.right ) < VELOCITY_DEAD_ZONE ) ||
+                           ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE &&
+                             std::abs( velocity_.left ) < VELOCITY_DEAD_ZONE );
+
+  if ( is_rotating ) {
+    if ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE )
+      left_torque += std::copysign( rotational_feed_forward_k_s_left_, velocity_.left );
+    if ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE )
+      right_torque += std::copysign( rotational_feed_forward_k_s_right_, velocity_.right );
+  }
+
   return { left_torque, right_torque };
 }
 
