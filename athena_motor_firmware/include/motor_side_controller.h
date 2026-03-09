@@ -63,9 +63,7 @@ public:
   unsigned long rearAgeMs() const { return rear_age_; }
 
   // --- Debug ---
-  const PIDDebugData &velocityPIDDebugData() const { return ladrc_.velocityDebugData(); }
-
-  const PIDDebugData &positionPIDDebugData() const { return ladrc_.positionDebugData(); }
+  const LadrcDebugData &ladrcDebugData() const { return ladrc_.debugData(); }
 
   float validFrontFreq( long age_ms ) const;
   float validRearFreq( long age_ms ) const;

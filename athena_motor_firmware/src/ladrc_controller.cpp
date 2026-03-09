@@ -120,32 +120,31 @@ float LadrcController::computeControlLaw( double v_ref )
 
   // Apply rate limiter, optionally bypassing during breakaway
   if ( breakaway_counter_ == 0 ) {
-    output =
-        std::max( last_output_ - max_delta_tau, std::min( output, last_output_ + max_delta_tau ) );
+    output = constrain( output, last_output_ - max_delta_tau, last_output_ + max_delta_tau );
   }
 
   // Dead-band compensation (if any) could go here.
 
   // Saturation
-  output = std::max( -config_.max_torque, std::min( output, config_.max_torque ) );
+  output = constrain( output, -config_.max_torque, config_.max_torque );
 
   u_prev_ = output;
   last_output_ = output;
 
   // Populate debug data
-  velocity_debug_data_.goal = v_ref;
-  velocity_debug_data_.current = x2_hat_;
-  velocity_debug_data_.dt = last_dt_;
-  velocity_debug_data_.error = v_ref - x2_hat_;
-  velocity_debug_data_.raw_output = tau_raw;
-  velocity_debug_data_.output = output;
-
-  position_debug_data_.goal = is_position_hold_ ? p_hold_ : x1_hat_;
-  position_debug_data_.current = x1_hat_;
-  position_debug_data_.dt = last_dt_;
-  position_debug_data_.error = is_position_hold_ ? ( p_hold_ - x1_hat_ ) : 0.0;
-  position_debug_data_.integral = x3_hat_;                     // piggyback to show disturbance
-  position_debug_data_.output = is_position_hold_ ? 1.0 : 0.0; // indicator
+  debug_data_.v_ref = v_ref;
+  debug_data_.p_hold = p_hold_;
+  debug_data_.is_position_hold = is_position_hold_;
+  debug_data_.x1_hat = x1_hat_;
+  debug_data_.x2_hat = x2_hat_;
+  debug_data_.x3_hat = x3_hat_;
+  debug_data_.tau_raw = tau_raw;
+  debug_data_.tau_ff = tau_ff;
+  debug_data_.tau_aug = tau_aug;
+  debug_data_.tau_safe = tau_safe;
+  debug_data_.output = output;
+  debug_data_.slip_holdoff_counter = slip_holdoff_counter_;
+  debug_data_.dt = last_dt_;
 
   return static_cast<float>( output );
 }

@@ -1,7 +1,5 @@
-PIDDebugData left_velocity_pid
-PIDDebugData right_velocity_pid
-PIDDebugData left_position_pid
-PIDDebugData right_position_pid
+LadrcDebugData left_ladrc
+LadrcDebugData right_ladrc
 MotorStatusDebugData status
 uint8 error_code
 uint16 average_loop_time_us

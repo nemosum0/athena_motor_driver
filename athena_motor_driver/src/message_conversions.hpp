@@ -7,28 +7,32 @@
 
 #include <athena_motor_interface/athena_motor_interfaces.h>
 #include <athena_motor_interface/msg/debug_data.hpp>
+#include <athena_motor_interface/msg/ladrc_debug_data.hpp>
 
-inline athena_motor_interface::msg::PIDDebugData toMsg( const PIDDebugData &pid_debug )
+inline athena_motor_interface::msg::LadrcDebugData toMsg( const LadrcDebugData &ladrc_debug )
 {
-  athena_motor_interface::msg::PIDDebugData msg;
-  msg.goal = pid_debug.goal;
-  msg.current = pid_debug.current;
-  msg.dt = pid_debug.dt;
-  msg.error = pid_debug.error;
-  msg.derivative = pid_debug.derivative;
-  msg.integral = pid_debug.integral;
-  msg.raw_output = pid_debug.raw_output;
-  msg.output = pid_debug.output;
+  athena_motor_interface::msg::LadrcDebugData msg;
+  msg.v_ref = ladrc_debug.v_ref;
+  msg.p_hold = ladrc_debug.p_hold;
+  msg.is_position_hold = ladrc_debug.is_position_hold;
+  msg.x1_hat = ladrc_debug.x1_hat;
+  msg.x2_hat = ladrc_debug.x2_hat;
+  msg.x3_hat = ladrc_debug.x3_hat;
+  msg.tau_raw = ladrc_debug.tau_raw;
+  msg.tau_ff = ladrc_debug.tau_ff;
+  msg.tau_aug = ladrc_debug.tau_aug;
+  msg.tau_safe = ladrc_debug.tau_safe;
+  msg.output = ladrc_debug.output;
+  msg.slip_holdoff_counter = ladrc_debug.slip_holdoff_counter;
+  msg.dt = ladrc_debug.dt;
   return msg;
 }
 
 inline athena_motor_interface::msg::DebugData toMsg( const MotorDebugData &debug_data )
 {
   athena_motor_interface::msg::DebugData msg;
-  msg.left_velocity_pid = toMsg( debug_data.left_velocity_pid );
-  msg.right_velocity_pid = toMsg( debug_data.right_velocity_pid );
-  msg.left_position_pid = toMsg( debug_data.left_position_pid );
-  msg.right_position_pid = toMsg( debug_data.right_position_pid );
+  msg.left_ladrc = toMsg( debug_data.left_ladrc );
+  msg.right_ladrc = toMsg( debug_data.right_ladrc );
   msg.status.freq_front_left = debug_data.status.freq_front_left;
   msg.status.freq_front_right = debug_data.status.freq_front_right;
   msg.status.freq_rear_left = debug_data.status.freq_rear_left;

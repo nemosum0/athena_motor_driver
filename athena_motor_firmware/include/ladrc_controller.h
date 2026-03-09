@@ -45,9 +45,7 @@ public:
     u_prev_ = std::max( -config_.max_torque, std::min( torque, config_.max_torque ) );
   }
 
-  const PIDDebugData &velocityDebugData() const { return velocity_debug_data_; }
-
-  const PIDDebugData &positionDebugData() const { return position_debug_data_; }
+  const LadrcDebugData &debugData() const { return debug_data_; }
 
   double getX1Hat() const { return x1_hat_; }
 
@@ -79,6 +77,5 @@ private:
   double last_output_ = 0.0;
   double last_dt_ = 0.0;
 
-  PIDDebugData velocity_debug_data_;
-  PIDDebugData position_debug_data_;
+  LadrcDebugData debug_data_;
 };

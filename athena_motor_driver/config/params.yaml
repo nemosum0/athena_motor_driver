@@ -5,22 +5,31 @@
     wheel_separation: 1.248
     rotational_amplification: 4.0
     wheel_radius: 0.075
-    left_velocity_pid.k_p: 5.0
-    left_velocity_pid.k_i: 0.0
-    left_velocity_pid.k_d: 0.0
-    right_velocity_pid.k_p: 5.0
-    right_velocity_pid.k_i: 0.0
-    right_velocity_pid.k_d: 0.0
-    left_position_pid.k_p: 5.0
-    left_position_pid.k_i: 0.0
-    left_position_pid.k_d: 0.0
-    right_position_pid.k_p: 5.0
-    right_position_pid.k_i: 0.0
-    right_position_pid.k_d: 0.0
-    left_velocity_feed_forward.k_v: 0.3
-    left_velocity_feed_forward.k_s: 0.8
-    left_velocity_feed_forward.k_s_rotational: 2.0
-    right_velocity_feed_forward.k_v: 0.3
-    right_velocity_feed_forward.k_s: 0.8
-    right_velocity_feed_forward.k_s_rotational: 2.0
+    
+    # LADRC Parameters
+    # b0: System gain (acceleration per unit torque)
+    # omega_c: Controller bandwidth (rad/s)
+    # omega_o: Observer bandwidth (rad/s), typically 3-5x omega_c
+    # kp_pos: Position hold gain (stiffness on slopes)
+    # f_c: Coulomb friction feedforward (Nm)
+    # f_s: Static friction breakaway assist (Nm)
+    
+    left_ladrc.b0: 7.0
+    left_ladrc.omega_c: 10.0
+    left_ladrc.omega_o: 50.0
+    left_ladrc.kp_pos: 3.0
+    left_ladrc.f_c: 3.1
+    left_ladrc.f_s: 2.6
+    left_ladrc.slip_torque_threshold: 5.0
+    left_ladrc.slip_vel_threshold: 1.0
+
+    right_ladrc.b0: 7.0
+    right_ladrc.omega_c: 10.0
+    right_ladrc.omega_o: 50.0
+    right_ladrc.kp_pos: 3.0
+    right_ladrc.f_c: 3.1
+    right_ladrc.f_s: 2.6
+    right_ladrc.slip_torque_threshold: 5.0
+    right_ladrc.slip_vel_threshold: 1.0
+
     invert_forward_direction: true

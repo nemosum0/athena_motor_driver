@@ -142,19 +142,26 @@ struct UpdateSettings {
 REFL_AUTO( type( UpdateSettings, crosstalk::id( 6 ) ), field( enable_debug ),
            field( disable_acceleration_limiting ) )
 
-struct PIDDebugData {
-  float goal = std::numeric_limits<float>::quiet_NaN();
-  float current = std::numeric_limits<float>::quiet_NaN();
-  float dt = std::numeric_limits<float>::quiet_NaN();
-  float error = std::numeric_limits<float>::quiet_NaN();
-  float derivative = std::numeric_limits<float>::quiet_NaN();
-  float integral = std::numeric_limits<float>::quiet_NaN();
-  float raw_output = std::numeric_limits<float>::quiet_NaN();
-  float output = std::numeric_limits<float>::quiet_NaN();
+struct LadrcDebugData {
+  float v_ref = 0.f;
+  float p_hold = 0.f;
+  bool is_position_hold = false;
+  float x1_hat = 0.f;
+  float x2_hat = 0.f;
+  float x3_hat = 0.f;
+  float tau_raw = 0.f;
+  float tau_ff = 0.f;
+  float tau_aug = 0.f;
+  float tau_safe = 0.f;
+  float output = 0.f;
+  int32_t slip_holdoff_counter = 0;
+  float dt = 0.f;
 };
 
-REFL_AUTO( type( PIDDebugData ), field( goal ), field( current ), field( dt ), field( error ),
-           field( derivative ), field( integral ), field( raw_output ), field( output ) )
+REFL_AUTO( type( LadrcDebugData, crosstalk::id( 9 ) ), field( v_ref ), field( p_hold ),
+           field( is_position_hold ), field( x1_hat ), field( x2_hat ), field( x3_hat ),
+           field( tau_raw ), field( tau_ff ), field( tau_aug ), field( tau_safe ), field( output ),
+           field( slip_holdoff_counter ), field( dt ) )
 
 struct MotorStatusDebugData {
   float freq_front_left = 0;
@@ -167,18 +174,15 @@ REFL_AUTO( type( MotorStatusDebugData ), field( freq_front_left ), field( freq_f
            field( freq_rear_left ), field( freq_rear_right ) )
 
 struct MotorDebugData {
-  PIDDebugData left_velocity_pid;
-  PIDDebugData right_velocity_pid;
-  PIDDebugData left_position_pid;
-  PIDDebugData right_position_pid;
+  LadrcDebugData left_ladrc;
+  LadrcDebugData right_ladrc;
   MotorStatusDebugData status;
   enum class Error { NO_ERROR, NO_MOTOR_STATUS };
   Error error;
   uint16_t average_loop_time_us = 0;
 };
 
-REFL_AUTO( type( MotorDebugData, crosstalk::id( 7 ) ), field( left_velocity_pid ),
-           field( right_velocity_pid ), field( left_position_pid ), field( right_position_pid ),
+REFL_AUTO( type( MotorDebugData, crosstalk::id( 7 ) ), field( left_ladrc ), field( right_ladrc ),
            field( status ), field( error ), field( average_loop_time_us ) )
 
 struct TeensyRebootCommand {

@@ -8,9 +8,9 @@ find_package(builtin_interfaces REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   msg/DebugData.msg
   msg/FullMotorStatus.msg
+  msg/LadrcDebugData.msg
   msg/MotorStatus.msg
   msg/MotorStatusDebugData.msg
-  msg/PIDDebugData.msg
   msg/TorqueCommand.msg
   DEPENDENCIES
   builtin_interfaces

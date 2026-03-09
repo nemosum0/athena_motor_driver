@@ -50,6 +50,8 @@ void MotorController::stop()
   command_.right = 0;
   target_velocity_.left = 0;
   target_velocity_.right = 0;
+  left_.resetControllers();
+  right_.resetControllers();
 }
 
 namespace
@@ -271,10 +273,8 @@ void MotorController::collectDebugData()
   debug_data_.status.freq_front_right = right_.validFrontFreq( status_age_ms );
   debug_data_.status.freq_rear_left = left_.validRearFreq( status_age_ms );
   debug_data_.status.freq_rear_right = right_.validRearFreq( status_age_ms );
-  debug_data_.left_velocity_pid = left_.velocityPIDDebugData();
-  debug_data_.right_velocity_pid = right_.velocityPIDDebugData();
-  debug_data_.left_position_pid = left_.positionPIDDebugData();
-  debug_data_.right_position_pid = right_.positionPIDDebugData();
+  debug_data_.left_ladrc = left_.ladrcDebugData();
+  debug_data_.right_ladrc = right_.ladrcDebugData();
 }
 
 const FullMotorStatus &MotorController::update()
