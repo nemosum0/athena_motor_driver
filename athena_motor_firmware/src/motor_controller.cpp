@@ -54,7 +54,9 @@ void MotorController::setRotationalFeedForwardGains( float left_k_s, float right
 
 void MotorController::stop()
 {
-  command_ = MotorCommand();
+  command_.mode = MotorCommand::MotorMode::BRAKE;
+  command_.left = 0;
+  command_.right = 0;
   target_velocity_.left = 0;
   target_velocity_.right = 0;
 }

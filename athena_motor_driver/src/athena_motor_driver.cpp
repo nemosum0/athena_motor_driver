@@ -125,10 +125,11 @@ void AthenaMotorDriver::update()
     crosstalk::WriteResult result = crosstalk::WriteResult::Success;
     if ( last_motor_command_received_ + 250ms < now() ) {
       if ( is_moving_ ) {
-        RCLCPP_WARN( get_logger(), "No twist command in 250ms. Sending velocity 0." );
+        RCLCPP_WARN( get_logger(), "No command in 250ms. Sending 0 command." );
         is_moving_ = false;
       }
-      MotorCommand command = MotorCommand::Velocity( 0, 0 );
+      MotorCommand command =
+          torque_mode_ ? MotorCommand::Torque( 0, 0 ) : MotorCommand::Velocity( 0, 0 );
       result = cross_talker_->sendObject( command );
     } else if ( torque_mode_ ) {
       is_moving_ = true;
