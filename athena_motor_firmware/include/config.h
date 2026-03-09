@@ -48,9 +48,12 @@ static constexpr int MAX_RESET_SKIP_COUNT = 10; // Cycles to skip after comm fai
 // ============================================================
 // Position filter
 // ============================================================
-// Range comes from 14-bit encoder (16384 ticks) mapped through gear ratio
+// Range comes from 14-bit encoder (16384 ticks) mapped through gear ratio.
+// This was recorded, as I'm unsure about how the motor limits are computed.
+// It seems to be based on a range of 512 ticks, but it's not based on 9-bit as it
+// goes above 255. Maybe -256 to +256. Then it would be +/-176,75774051
 static constexpr float POSITION_LOWER_END = -176.756729f;
-static constexpr float POSITION_UPPER_END = 176.724319f;
+static constexpr float POSITION_UPPER_END = 176.752930f;
 
 // ============================================================
 // Velocity filter
