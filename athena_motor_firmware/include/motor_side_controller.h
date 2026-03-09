@@ -35,10 +35,10 @@ public:
   void initializePosition();
 
   /// Updates the ESO. Must be called every tick.
-  void updateObserver();
+  void updateObserver( float dt );
 
   /// Compute torque output for the given target velocity
-  float computeTorque( float target_velocity );
+  float computeTorque( float target_velocity, float dt );
 
   /// Record actual torque applied to motors
   void setAppliedTorque( float torque );

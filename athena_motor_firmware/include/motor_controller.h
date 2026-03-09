@@ -48,8 +48,9 @@ private:
     Torque() = default;
   };
 
-  Torque computeTorque();
-  void computeMotorCommands( MotorCommCommand &left_command, MotorCommCommand &right_command );
+  Torque computeTorque( float dt );
+  void computeMotorCommands( MotorCommCommand &left_command, MotorCommCommand &right_command,
+                             float dt );
   void sendReceiveBus( std::shared_ptr<MotorComm> &comm, int &reset_skip_count,
                        const MotorCommCommand &left_command, const MotorCommCommand &right_command,
                        bool bus_working, bool is_front );

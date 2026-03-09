@@ -34,15 +34,18 @@ public:
   void reset();
 
   /// Updates the internal ESO with new measurements. Must be called every tick even if in torque/brake mode.
-  void updateObserver( double pos_meas, double torque_meas );
+  void updateObserver( double pos_meas, double torque_meas, double dt );
 
   /// Computes the required torque based on the target velocity and the internal ESO state.
-  float computeControlLaw( double v_ref );
+  float computeControlLaw( double v_ref, double dt );
 
   /// Tell the observer what torque was actually applied (e.g. if saturated by driver, or when in raw torque mode)
   void setAppliedTorque( double torque )
   {
     u_prev_ = std::max( -config_.max_torque, std::min( torque, config_.max_torque ) );
+    debug_data_.output = u_prev_;
+    debug_data_.tau_safe = u_prev_;
+    debug_data_.tau_aug = u_prev_;
   }
 
   const LadrcDebugData &debugData() const { return debug_data_; }
@@ -55,7 +58,6 @@ public:
 
 private:
   Config config_;
-  elapsedMicros elapsed_;
 
   // ESO states
   double x1_hat_ = 0.0;
@@ -75,7 +77,6 @@ private:
   double last_torque_meas_ = 0.0;
   bool first_compute_ = true;
   double last_output_ = 0.0;
-  double last_dt_ = 0.0;
 
   LadrcDebugData debug_data_;
 };

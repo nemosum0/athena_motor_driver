@@ -79,15 +79,14 @@ float limitTorqueChange( float target_torque, float current_torque, float max_to
 }
 } // namespace
 
-MotorController::Torque MotorController::computeTorque()
+MotorController::Torque MotorController::computeTorque( float dt )
 {
   if ( !initialized_position_ ) {
     return { 0, 0 }; // Do not issue any torque commands until position is initialized
   }
-  // Cap elapsed time to 30 ms to avoid large jumps after long delays
-  long elapsed_micros = std::min<long>( time_since_last_command_, 30'000 );
+
   if ( command_.mode == MotorCommand::MotorMode::TORQUE ) {
-    float max_torque_change = MAX_TORQUE_CHANGE * elapsed_micros / 1E6f;
+    float max_torque_change = MAX_TORQUE_CHANGE * dt;
     float torque_left = limitTorqueChange( command_.left, torque_.left, max_torque_change );
     float torque_right = limitTorqueChange( -command_.right, torque_.right, max_torque_change );
     torque_.left = torque_left;
@@ -106,21 +105,19 @@ MotorController::Torque MotorController::computeTorque()
     acceleration = MAX_ACCELERATION;
   }
 
-  const float max_velocity_change = acceleration * elapsed_micros / 1E6f;
+  const float max_velocity_change = acceleration * dt;
 
   velocity_.left = limitVelocityChange( target_velocity_.left, velocity_.left, max_velocity_change );
   velocity_.right =
       limitVelocityChange( target_velocity_.right, velocity_.right, max_velocity_change );
 
   if ( disable_acceleration_limiting_ ) {
-    // If acceleration limits are disabled, we just set the target velocity directly
-    // This is useful for tuning the PID controller but should not be used in normal operation
     velocity_.left = target_velocity_.left;
     velocity_.right = target_velocity_.right;
   }
 
-  float left_torque = left_.computeTorque( velocity_.left );
-  float right_torque = right_.computeTorque( velocity_.right );
+  float left_torque = left_.computeTorque( velocity_.left, dt );
+  float right_torque = right_.computeTorque( velocity_.right, dt );
 
   if ( !std::isfinite( left_torque ) || !std::isfinite( right_torque ) ) {
     static ThrottlePrinter printer( 1000 );
@@ -129,21 +126,7 @@ MotorController::Torque MotorController::computeTorque()
     right_torque = 0;
   }
 
-  // Detect rotation: wheels moving in opposite directions (or one moving, one still)
-  const bool is_rotating = ( velocity_.left * velocity_.right < 0 ) ||
-                           ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE &&
-                             std::abs( velocity_.right ) < VELOCITY_DEAD_ZONE ) ||
-                           ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE &&
-                             std::abs( velocity_.left ) < VELOCITY_DEAD_ZONE );
-
-  if ( is_rotating ) {
-    if ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE )
-      left_torque += std::copysign( rotational_feed_forward_k_s_left_, velocity_.left );
-    if ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE )
-      right_torque += std::copysign( rotational_feed_forward_k_s_right_, velocity_.right );
-  }
-
-  const float max_torque_change = MAX_TORQUE_CHANGE * elapsed_micros / 1E6f;
+  const float max_torque_change = MAX_TORQUE_CHANGE * dt;
   left_torque = limitTorqueChange( left_torque, torque_.left, max_torque_change );
   right_torque = limitTorqueChange( right_torque, torque_.right, max_torque_change );
   torque_.left = left_torque;
@@ -164,7 +147,7 @@ static void setCommandFromTorque( MotorCommCommand &command, float torque )
 }
 
 void MotorController::computeMotorCommands( MotorCommCommand &left_command,
-                                            MotorCommCommand &right_command )
+                                            MotorCommCommand &right_command, float dt )
 {
   left_command.motor_id = 0;
   right_command.motor_id = 1;
@@ -178,7 +161,7 @@ void MotorController::computeMotorCommands( MotorCommCommand &left_command,
     right_command.mode = MotorMode::BRAKE;
     left_command.torque = 0;
     right_command.torque = 0;
-    // Reset all PID controllers so it will not try to jump back to a position when power is restored
+    // Reset all controllers so it will not try to jump back to a position when power is restored
     left_.resetControllers();
     right_.resetControllers();
     left_.setAppliedTorque( 0 );
@@ -186,13 +169,12 @@ void MotorController::computeMotorCommands( MotorCommCommand &left_command,
     initialized_position_ = false;
     debug_data_.error = MotorDebugData::Error::NO_MOTOR_STATUS;
   } else {
-    Torque torque = computeTorque();
+    Torque torque = computeTorque( dt );
     setCommandFromTorque( left_command, initialized_position_ ? torque.left : 0 );
     setCommandFromTorque( right_command, initialized_position_ ? torque.right : 0 );
     left_.setAppliedTorque( left_command.mode == MotorMode::FOC ? left_command.torque : 0 );
     right_.setAppliedTorque( right_command.mode == MotorMode::FOC ? right_command.torque : 0 );
   }
-  time_since_last_command_ = 0;
 }
 
 void MotorController::sendReceiveBus( std::shared_ptr<MotorComm> &comm, int &reset_skip_count,
@@ -281,6 +263,10 @@ const FullMotorStatus &MotorController::update()
 {
   debug_data_.error = MotorDebugData::Error::NO_ERROR;
 
+  // Cap dt to 30 ms to avoid large jumps after long delays
+  const float dt = std::min<float>( float( time_since_last_command_ ) / 1E6f, 0.030f );
+  time_since_last_command_ = 0;
+
   const bool front_working =
       left_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
   const bool rear_working =
@@ -299,16 +285,14 @@ const FullMotorStatus &MotorController::update()
   right_.addMeasurements();
 
   if ( initialized_position_ ) {
-    left_.updateObserver();
-    right_.updateObserver();
+    left_.updateObserver( dt );
+    right_.updateObserver( dt );
   }
-
   // 3. Compute control laws for the NEXT tick
-  computeMotorCommands( left_command_, right_command_ );
+  computeMotorCommands( left_command_, right_command_, dt );
 
   // 4. Telemetry
   assembleMotorStatus( left_command_, right_command_ );
-
   collectDebugData();
 
   return motor_status_;

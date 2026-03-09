@@ -68,7 +68,7 @@ void MotorSideController::resetPositionFilter() { position_filter_.reset(); }
 
 void MotorSideController::initializePosition() { ladrc_.reset(); }
 
-void MotorSideController::updateObserver()
+void MotorSideController::updateObserver( float dt )
 {
   const float measured_position = position_filter_.getFiltered();
   float measured_torque = 0.0f;
@@ -84,12 +84,12 @@ void MotorSideController::updateObserver()
   if ( valid_count > 0 ) {
     measured_torque /= valid_count;
   }
-  ladrc_.updateObserver( measured_position, measured_torque );
+  ladrc_.updateObserver( measured_position, measured_torque, dt );
 }
 
-float MotorSideController::computeTorque( float target_velocity )
+float MotorSideController::computeTorque( float target_velocity, float dt )
 {
-  return ladrc_.computeControlLaw( target_velocity );
+  return ladrc_.computeControlLaw( target_velocity, dt );
 }
 
 void MotorSideController::setAppliedTorque( float torque ) { ladrc_.setAppliedTorque( torque ); }

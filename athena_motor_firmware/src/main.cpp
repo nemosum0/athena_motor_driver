@@ -149,11 +149,13 @@ void loop()
     app.last_error = error;
   }
   if ( app.enable_debug ) {
-    auto debug_data = app.motor_controller.debugData();
+    auto &debug_data = app.motor_controller.debugData();
     noInterrupts();
-    debug_data.average_loop_time_us = app.average_loop_time_filter.getMean();
+    const uint16_t avg_loop_time = app.average_loop_time_filter.getMean();
     interrupts();
-    app.host_comm.sendObject( debug_data );
+    MotorDebugData msg = debug_data;
+    msg.average_loop_time_us = avg_loop_time;
+    app.host_comm.sendObject( msg );
   }
   app.status_led.update();
 

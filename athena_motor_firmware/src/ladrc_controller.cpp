@@ -24,20 +24,16 @@ void LadrcController::reset()
   last_torque_meas_ = 0.0;
   first_compute_ = true;
   last_output_ = 0.0;
-  last_dt_ = 0.0;
-  elapsed_ = 0;
+  debug_data_ = LadrcDebugData();
 }
 
-void LadrcController::updateObserver( double pos_meas, double torque_meas )
+void LadrcController::updateObserver( double pos_meas, double torque_meas, double dt )
 {
-  last_dt_ = float( elapsed_ ) / 1E6f;
-  elapsed_ = 0;
-
   if ( first_compute_ ) {
     x1_hat_ = pos_meas;
     prev_torque_meas_ = torque_meas;
-    last_dt_ = 0.002; // Default to 2ms on first tick to avoid 0 dt issues
     first_compute_ = false;
+    return;
   }
 
   // 1. Extended State Observer (ESO) Update - Forward Euler
@@ -46,15 +42,21 @@ void LadrcController::updateObserver( double pos_meas, double torque_meas )
   double beta3 = config_.omega_o * config_.omega_o * config_.omega_o;
 
   double e_obs = pos_meas - x1_hat_;
-  x1_hat_ += last_dt_ * ( x2_hat_ + beta1 * e_obs );
-  x2_hat_ += last_dt_ * ( x3_hat_ + config_.b0 * u_prev_ + beta2 * e_obs );
-  x3_hat_ += last_dt_ * ( beta3 * e_obs );
+  x1_hat_ += dt * ( x2_hat_ + beta1 * e_obs );
+  x2_hat_ += dt * ( x3_hat_ + config_.b0 * u_prev_ + beta2 * e_obs );
+  x3_hat_ += dt * ( beta3 * e_obs );
 
   last_pos_meas_ = pos_meas;
   last_torque_meas_ = torque_meas;
+
+  // Populate debug data with observer states
+  debug_data_.x1_hat = x1_hat_;
+  debug_data_.x2_hat = x2_hat_;
+  debug_data_.x3_hat = x3_hat_;
+  debug_data_.dt = dt;
 }
 
-float LadrcController::computeControlLaw( double v_ref )
+float LadrcController::computeControlLaw( double v_ref, double dt )
 {
   if ( first_compute_ ) {
     return 0.0f; // Observer must be initialized first
@@ -115,7 +117,7 @@ float LadrcController::computeControlLaw( double v_ref )
   }
 
   // 5. Output Conditioning
-  double max_delta_tau = config_.max_torque_change * last_dt_;
+  double max_delta_tau = config_.max_torque_change * dt;
   double output = tau_safe;
 
   // Apply rate limiter, optionally bypassing during breakaway
@@ -135,16 +137,12 @@ float LadrcController::computeControlLaw( double v_ref )
   debug_data_.v_ref = v_ref;
   debug_data_.p_hold = p_hold_;
   debug_data_.is_position_hold = is_position_hold_;
-  debug_data_.x1_hat = x1_hat_;
-  debug_data_.x2_hat = x2_hat_;
-  debug_data_.x3_hat = x3_hat_;
   debug_data_.tau_raw = tau_raw;
   debug_data_.tau_ff = tau_ff;
   debug_data_.tau_aug = tau_aug;
   debug_data_.tau_safe = tau_safe;
   debug_data_.output = output;
   debug_data_.slip_holdoff_counter = slip_holdoff_counter_;
-  debug_data_.dt = last_dt_;
 
   return static_cast<float>( output );
 }
