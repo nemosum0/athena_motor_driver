@@ -73,6 +73,7 @@ private:
 
   MotorCommand command_;
   Velocity target_velocity_;
+  Torque torque_;
   Velocity velocity_;
   elapsedMicros time_since_last_command_ = 0;
 

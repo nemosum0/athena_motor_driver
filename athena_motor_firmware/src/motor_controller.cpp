@@ -74,6 +74,14 @@ float limitVelocityChange( float target_velocity, float current_velocity, float 
   }
   return current_velocity + std::copysign( max_velocity_change, target_velocity - current_velocity );
 }
+
+float limitTorqueChange( float target_torque, float current_torque, float max_torque_change )
+{
+  if ( std::abs( target_torque - current_torque ) <= max_torque_change ) {
+    return target_torque;
+  }
+  return current_torque + std::copysign( max_torque_change, target_torque - current_torque );
+}
 } // namespace
 
 MotorController::Torque MotorController::computeTorque()
@@ -81,8 +89,15 @@ MotorController::Torque MotorController::computeTorque()
   if ( !initialized_position_ ) {
     return { 0, 0 }; // Do not issue any torque commands until position is initialized
   }
+  // Cap elapsed time to 30 ms to avoid large jumps after long delays
+  long elapsed_micros = std::min<long>( time_since_last_command_, 30'000 );
   if ( command_.mode == MotorCommand::MotorMode::TORQUE ) {
-    return { command_.left, -command_.right };
+    float max_torque_change = MAX_TORQUE_CHANGE * elapsed_micros / 1E6f;
+    float torque_left = limitTorqueChange( command_.left, torque_.left, max_torque_change );
+    float torque_right = limitTorqueChange( -command_.right, torque_.right, max_torque_change );
+    torque_.left = torque_left;
+    torque_.right = torque_right;
+    return { torque_left, torque_right };
   } else if ( command_.mode == MotorCommand::MotorMode::BRAKE ) {
     return { 0, 0 };
   }
@@ -96,8 +111,6 @@ MotorController::Torque MotorController::computeTorque()
     acceleration = MAX_ACCELERATION;
   }
 
-  // Cap elapsed time to 30 ms to avoid large jumps after long delays
-  long elapsed_micros = std::min<long>( time_since_last_command_, 30'000 );
   const float max_velocity_change = acceleration * elapsed_micros / 1E6f;
 
   velocity_.left = limitVelocityChange( target_velocity_.left, velocity_.left, max_velocity_change );
@@ -134,6 +147,12 @@ MotorController::Torque MotorController::computeTorque()
     if ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE )
       right_torque += std::copysign( rotational_feed_forward_k_s_right_, velocity_.right );
   }
+
+  const float max_torque_change = MAX_TORQUE_CHANGE * elapsed_micros / 1E6f;
+  left_torque = limitTorqueChange( left_torque, torque_.left, max_torque_change );
+  right_torque = limitTorqueChange( right_torque, torque_.right, max_torque_change );
+  torque_.left = left_torque;
+  torque_.right = right_torque;
 
   return { left_torque, right_torque };
 }
