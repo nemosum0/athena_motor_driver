@@ -29,11 +29,7 @@ static MotorStatus toMotorStatus( const MotorCommStatus &status )
   return result;
 }
 
-MotorSideController::MotorSideController()
-    : velocity_pid_( 0, 0, 0, -MOTOR_TORQUE_LIMIT, MOTOR_TORQUE_LIMIT, MAX_TORQUE_CHANGE ),
-      position_pid_( 0, 0, 0, -MOTOR_TORQUE_LIMIT, MOTOR_TORQUE_LIMIT, MAX_TORQUE_CHANGE )
-{
-}
+MotorSideController::MotorSideController() { }
 
 void MotorSideController::updateStatus( const MotorCommStatus &status, uint8_t expected_motor_id,
                                         MotorStatus &out_status,
@@ -60,7 +56,6 @@ void MotorSideController::updateRearStatus( const MotorCommStatus &status, uint8
 void MotorSideController::addMeasurements()
 {
   position_filter_.addMeasurements( front_status_, rear_status_ );
-  velocity_filter_.addMeasurements( front_status_, rear_status_ );
 }
 
 bool MotorSideController::isWorking( int timeout_ms ) const
@@ -71,53 +66,39 @@ bool MotorSideController::isWorking( int timeout_ms ) const
 
 void MotorSideController::resetPositionFilter() { position_filter_.reset(); }
 
-void MotorSideController::initializePosition() { hold_position_ = position_filter_.getFiltered(); }
+void MotorSideController::initializePosition() { ladrc_.reset(); }
+
+void MotorSideController::updateObserver()
+{
+  const float measured_position = position_filter_.getFiltered();
+  float measured_torque = 0.0f;
+  int valid_count = 0;
+  if ( front_status_.valid ) {
+    measured_torque += front_status_.torque;
+    valid_count++;
+  }
+  if ( rear_status_.valid ) {
+    measured_torque += rear_status_.torque;
+    valid_count++;
+  }
+  if ( valid_count > 0 ) {
+    measured_torque /= valid_count;
+  }
+  ladrc_.updateObserver( measured_position, measured_torque );
+}
 
 float MotorSideController::computeTorque( float target_velocity )
 {
-  if ( std::abs( target_velocity ) < VELOCITY_DEAD_ZONE ) {
-    if ( control_mode_ != ControlMode::POSITION ) {
-      control_mode_ = ControlMode::POSITION;
-      position_filter_.reset();
-      position_pid_.reset();
-      hold_position_ = position_filter_.getFiltered();
-    }
-    const float measured_position = position_filter_.getFiltered();
-    return position_pid_.computeTorque( hold_position_, measured_position );
-  } else {
-    if ( control_mode_ != ControlMode::VELOCITY ) {
-      control_mode_ = ControlMode::VELOCITY;
-      velocity_pid_.reset();
-    }
-    const float measured_velocity = velocity_filter_.getFiltered();
-    return velocity_pid_.computeTorque( target_velocity, measured_velocity );
-  }
+  return ladrc_.computeControlLaw( target_velocity );
 }
 
-void MotorSideController::resetPIDControllers()
-{
-  velocity_pid_.reset();
-  position_pid_.reset();
-}
+void MotorSideController::setAppliedTorque( float torque ) { ladrc_.setAppliedTorque( torque ); }
 
-void MotorSideController::setPositionPIDGains( float kp, float ki, float kd )
-{
-  position_pid_.setGains( kp, ki, kd );
-}
+void MotorSideController::resetControllers() { ladrc_.reset(); }
 
-void MotorSideController::setVelocityPIDGains( float kp, float ki, float kd )
+void MotorSideController::setLadrcConfig( const LadrcController::Config &config )
 {
-  velocity_pid_.setGains( kp, ki, kd );
-}
-
-void MotorSideController::setVelocityFeedForwardGains( float k_v, float k_s )
-{
-  velocity_pid_.setFeedForwardGains( k_v, k_s );
-}
-
-void MotorSideController::setPositionFeedForwardGains( float k_v, float k_s )
-{
-  position_pid_.setFeedForwardGains( k_v, k_s );
+  ladrc_.setConfig( config );
 }
 
 float MotorSideController::validFrontFreq( long age_ms ) const

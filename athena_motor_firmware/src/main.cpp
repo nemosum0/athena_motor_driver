@@ -104,43 +104,23 @@ void loop()
       app.host_comm.sendObject( AckCommand{ CommandType::MOTOR_COMMAND } );
       break;
     }
-    case crosstalk::object_id<ChangePIDGainsCommand>(): {
-      ChangePIDGainsCommand command;
+    case crosstalk::object_id<ChangeLadrcGainsCommand>(): {
+      ChangeLadrcGainsCommand command;
       if ( app.host_comm.readObject( command ) != crosstalk::ReadResult::Success ) {
         break;
       }
-      Serial.printf( "Received new velocity PID gains: left kP=%.3f, kI=%.3f, kD=%.3f; right "
-                     "kP=%.3f, kI=%.3f, kD=%.3f\n",
-                     command.left_velocity_pid_gains.k_p, command.left_velocity_pid_gains.k_i,
-                     command.left_velocity_pid_gains.k_d, command.right_velocity_pid_gains.k_p,
-                     command.right_velocity_pid_gains.k_i, command.right_velocity_pid_gains.k_d );
-      Serial.printf( "Received new position PID gains: left kP=%.3f, kI=%.3f, kD=%.3f; right "
-                     "kP=%.3f, kI=%.3f, kD=%.3f\n",
-                     command.left_position_pid_gains.k_p, command.left_position_pid_gains.k_i,
-                     command.left_position_pid_gains.k_d, command.right_position_pid_gains.k_p,
-                     command.right_position_pid_gains.k_i, command.right_position_pid_gains.k_d );
-      Serial.printf(
-          "Received new velocity feed-forward gains: left kV=%.3f, kS=%.3f, kS_rot=%.3f; right "
-          "kV=%.3f, kS=%.3f, kS_rot=%.3f\n",
-          command.left_velocity_feed_forward_k_v, command.left_velocity_feed_forward_k_s,
-          command.left_velocity_feed_forward_k_s_rotational,
-          command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s,
-          command.right_velocity_feed_forward_k_s_rotational );
-      app.motor_controller.setVelocityPIDGains( command.left_velocity_pid_gains,
-                                                command.right_velocity_pid_gains );
-      app.motor_controller.setPositionPIDGains( command.left_position_pid_gains,
-                                                command.right_position_pid_gains );
-      app.motor_controller.setVelocityFeedForwardGains(
-          command.left_velocity_feed_forward_k_v, command.left_velocity_feed_forward_k_s,
-          command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s );
-      app.motor_controller.setRotationalFeedForwardGains(
-          command.left_velocity_feed_forward_k_s_rotational,
-          command.right_velocity_feed_forward_k_s_rotational );
+      Serial.printf( "Received new LADRC gains: left b0=%.3f, omega_c=%.3f, omega_o=%.3f, "
+                     "kp_pos=%.3f, f_c=%.3f, f_s=%.3f; right "
+                     "b0=%.3f, omega_c=%.3f, omega_o=%.3f, kp_pos=%.3f, f_c=%.3f, f_s=%.3f\n",
+                     command.left_gains.b0, command.left_gains.omega_c, command.left_gains.omega_o,
+                     command.left_gains.kp_pos, command.left_gains.f_c, command.left_gains.f_s,
+                     command.right_gains.b0, command.right_gains.omega_c, command.right_gains.omega_o,
+                     command.right_gains.kp_pos, command.right_gains.f_c, command.right_gains.f_s );
 
-      app.motor_controller.setPositionFeedForwardGains( 0.0f, 0.0f, 0.0f, 0.0f );
+      app.motor_controller.setLadrcGains( command.left_gains, command.right_gains );
       app.time_since_last_command = 0;
       app.status_led.speed = StatusLED::FAST;
-      app.host_comm.sendObject( AckCommand{ CommandType::CHANGE_PID_GAINS } );
+      app.host_comm.sendObject( AckCommand{ CommandType::CHANGE_LADRC_GAINS } );
       break;
     }
     case crosstalk::object_id<UpdateSettings>(): {

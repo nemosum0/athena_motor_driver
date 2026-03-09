@@ -41,6 +41,13 @@ static constexpr float VELOCITY_DEAD_ZONE = 0.1f;              // rad/s, below t
 static constexpr float FEED_FORWARD_DEAD_ZONE = 0.1f;          // Goal threshold for feed-forward
 
 // ============================================================
+// LADRC specific constants
+// ============================================================
+static constexpr int LADRC_POSITION_HOLD_TICKS = 5;
+static constexpr int LADRC_BREAKAWAY_TICKS = 15;
+static constexpr int LADRC_SLIP_HOLDOFF_TICKS = 20;
+
+// ============================================================
 // Communication recovery
 // ============================================================
 static constexpr int MAX_RESET_SKIP_COUNT = 10; // Cycles to skip after comm failure

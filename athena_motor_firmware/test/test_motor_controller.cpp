@@ -26,6 +26,7 @@ struct StatusDelayItem {
   uint32_t timestamp_ms;
   MotorState fl, fr, rl, rr;
   float robot_velocity;
+  float robot_yaw_rate;
 };
 
 struct PhysicsSim {
@@ -42,8 +43,14 @@ struct PhysicsSim {
   // Physical constants
   float robot_mass = 45.0f;    // kg
   float wheel_radius = 0.075f; // m
-  float track_inertia = 0.1f;  // 5x lower than before
-  float dt = 0.0005f;          // 0.5ms
+  float track_inertia = 0.1f;
+  float track_separation = 0.55f; // m
+  float robot_inertia_yaw = 5.0f; // kg*m^2
+  float dt = 0.0005f;             // 0.5ms
+
+  float robot_yaw_rate = 0; // rad/s
+  float f_traction_l = 0;
+  float f_traction_r = 0;
 
   // Motor constants (Back-EMF simulation)
   float motor_max_omega = 50.0f; // rad/s (roughly 500 RPM)
@@ -51,8 +58,10 @@ struct PhysicsSim {
   // Friction parameters
   float mu_static = 0.9f;
   float mu_dynamic = 0.7f;
-  float mu_stair_slip = 0.1f;
-  float mu_stair_hold = 0.8f;
+  float mu_stair_hold_static = 0.9f;
+  float mu_stair_hold_dynamic = 0.8f;
+  float mu_stair_slip_static = 0.3f;
+  float mu_stair_slip_dynamic = 0.1f;
 
   float rolling_resistance = 145.0f;
   float damping_coeff = 220.0f;
@@ -64,6 +73,9 @@ struct PhysicsSim {
 
   void step()
   {
+    float v_track_l = fl.velocity * wheel_radius;
+    float v_track_r = -fr.velocity * wheel_radius;
+
     // Torque is reduced by back-EMF as speed increases
     auto apply_back_emf = [&]( float torque, float omega ) {
       float speed_factor = 1.0f - std::abs( omega ) / motor_max_omega;
@@ -80,43 +92,68 @@ struct PhysicsSim {
     float f_right = apply_back_emf( fr.applied_torque, fr.velocity ) +
                     apply_back_emf( rr.applied_torque, rr.velocity );
 
-    float v_track_l = fl.velocity * wheel_radius;
-    float v_track_r = -fr.velocity * wheel_radius;
+    // Ground velocities at track centers
+    float v_ground_l = robot_velocity - robot_yaw_rate * ( track_separation / 2.0f );
+    float v_ground_r = robot_velocity + robot_yaw_rate * ( track_separation / 2.0f );
 
-    auto calc_traction = [&]( float v_track, float forward_torque ) {
+    auto calc_traction = [&]( float v_track, float v_ground ) {
       float N_side = ( robot_mass * 9.81f ) / 2.0f;
-      float max_static_force = mu_static * N_side;
-      float dynamic_force = mu_dynamic * N_side;
+      float mu_s = mu_static;
+      float mu_d = mu_dynamic;
 
       if ( stairs_mode ) {
-        if ( std::abs( v_track - robot_velocity ) > 0.3f )
+        if ( std::abs( v_track - v_ground ) > 0.3f )
           slipping_on_stairs = true;
-        else if ( std::abs( v_track - robot_velocity ) < 0.05f )
+        else if ( std::abs( v_track - v_ground ) < 0.05f )
           slipping_on_stairs = false;
-        float mu = slipping_on_stairs ? mu_stair_slip : mu_stair_hold;
-        max_static_force = dynamic_force = mu * N_side;
+
+        if ( slipping_on_stairs ) {
+          mu_s = mu_stair_slip_static;
+          mu_d = mu_stair_slip_dynamic;
+        } else {
+          mu_s = mu_stair_hold_static;
+          mu_d = mu_stair_hold_dynamic;
+        }
       }
 
-      float slip_vel = v_track - robot_velocity;
-      float traction_force = slip_vel * ( dynamic_force / 0.05f );
+      float max_static_force = mu_s * N_side;
+      float dynamic_force = mu_d * N_side;
+
+      float slip_vel = v_track - v_ground;
+      float traction_force = slip_vel * ( dynamic_force / 0.02f ); // Stiffer contact
       if ( std::abs( traction_force ) > max_static_force )
         traction_force = std::copysign( dynamic_force, traction_force );
       return traction_force;
     };
 
-    float F_l = calc_traction( v_track_l, f_left );
-    float F_r = calc_traction( v_track_r, -f_right );
+    f_traction_l = calc_traction( v_track_l, v_ground_l );
+    f_traction_r = calc_traction( v_track_r, v_ground_r );
 
+    // Resistances
     float F_res =
         std::copysign( rolling_resistance, robot_velocity ) + robot_velocity * damping_coeff;
-    if ( std::abs( robot_velocity ) < 0.01f && std::abs( F_l + F_r ) < rolling_resistance )
-      F_res = F_l + F_r;
+    if ( std::abs( robot_velocity ) < 0.01f &&
+         std::abs( f_traction_l + f_traction_r ) < rolling_resistance )
+      F_res = f_traction_l + f_traction_r;
 
-    float robot_accel = ( F_l + F_r - F_res ) / robot_mass;
+    // Skid steering resistance (rotational friction is higher)
+    float T_res = std::copysign( rolling_resistance * 2.0f, robot_yaw_rate ) +
+                  robot_yaw_rate * damping_coeff * 2.0f;
+    if ( std::abs( robot_yaw_rate ) < 0.01f &&
+         std::abs( ( f_traction_r - f_traction_l ) * ( track_separation / 2.0f ) ) <
+             rolling_resistance * 2.0f )
+      T_res = ( f_traction_r - f_traction_l ) * ( track_separation / 2.0f );
+
+    // Integrations
+    float robot_accel = ( f_traction_l + f_traction_r - F_res ) / robot_mass;
     robot_velocity += robot_accel * dt;
 
-    fl.velocity += ( f_left - F_l * wheel_radius ) / track_inertia * dt;
-    fr.velocity += ( f_right + F_r * wheel_radius ) / track_inertia * dt;
+    float yaw_accel = ( ( f_traction_r - f_traction_l ) * ( track_separation / 2.0f ) - T_res ) /
+                      robot_inertia_yaw;
+    robot_yaw_rate += yaw_accel * dt;
+
+    fl.velocity += ( f_left - f_traction_l * wheel_radius ) / track_inertia * dt;
+    fr.velocity += ( f_right + f_traction_r * wheel_radius ) / track_inertia * dt;
     rl.velocity = fl.velocity;
     rr.velocity = fr.velocity;
 
@@ -126,8 +163,7 @@ struct PhysicsSim {
     rr.position += rr.velocity * dt;
 
     if ( simulated_micros % 1000 == 0 ) {
-      history.push_back( { simulated_millis, fl, fr, rl, rr, robot_velocity } );
-      // Keep history for jitter/delay simulation (2-4ms)
+      history.push_back( { simulated_millis, fl, fr, rl, rr, robot_velocity, robot_yaw_rate } );
       uint32_t jittery_delay = transport_delay_ms + ( simulated_millis % 3 );
       while ( history.size() > jittery_delay + 1 ) history.pop_front();
     }
@@ -136,15 +172,24 @@ struct PhysicsSim {
   StatusDelayItem getDelayedState()
   {
     if ( history.empty() )
-      return { simulated_millis, fl, fr, rl, rr, robot_velocity };
+      return { simulated_millis, fl, fr, rl, rr, robot_velocity, robot_yaw_rate };
     auto state = history.front(); // Use oldest
     state.fl.velocity += noise_dist( gen );
     state.fr.velocity += noise_dist( gen );
+    state.rl.velocity += noise_dist( gen );
+    state.rr.velocity += noise_dist( gen );
+
+    // Position quantization
     auto quantize = []( float p ) {
       return std::round( p * 16384.0f / ( 2 * M_PI ) ) * ( 2 * M_PI ) / 16384.0f;
     };
     state.fl.position = quantize( state.fl.position );
     state.fr.position = quantize( state.fr.position );
+
+    // Torque feedback simulation
+    state.fl.applied_torque += noise_dist( gen ) * 0.1f;
+    state.fr.applied_torque += noise_dist( gen ) * 0.1f;
+
     return state;
   }
 };
@@ -193,12 +238,14 @@ void MotorComm::sendReceive( const MotorCommCommand &left_command,
   left_status.mode = left_command.mode;
   left_status.position = dml->position;
   left_status.velocity_high = dml->velocity;
+  left_status.torque = dml->applied_torque;
 
   right_status.valid = true;
   right_status.motor_id = right_command.motor_id;
   right_status.mode = right_command.mode;
   right_status.position = dmr->position;
   right_status.velocity_high = dmr->velocity;
+  right_status.torque = dmr->applied_torque;
 }
 
 class MotorControllerTest : public ::testing::Test
@@ -218,16 +265,18 @@ protected:
     simulated_millis = 0;
 
     // Load params from params.yaml
-    PIDGains vel_gains{ 5.0, 0.0, 0.0 };
-    PIDGains pos_gains{ 5.0, 0.0, 0.0 };
-    controller.setVelocityPIDGains( vel_gains, vel_gains );
-    controller.setPositionPIDGains( pos_gains, pos_gains );
-    controller.setVelocityFeedForwardGains( 0.3f, 0.8f, 0.3f, 0.8f );
-    controller.setRotationalFeedForwardGains( 2.0f, 2.0f );
+    LadrcGains gains;
+    gains.omega_c = 40.0f;
+    gains.omega_o = 120.0f; // Lowered from 150 for better stability at 500Hz
+    gains.b0 = 10.0f;       // 1/I = 1/0.1 = 10.0
+    gains.f_c = 0.5f;
+    gains.f_s = 1.0f;
+    controller.setLadrcGains( gains, gains );
 
     std::string test_name = ::testing::UnitTest::GetInstance()->current_test_info()->name();
     log_file.open( test_name + ".csv" );
-    log_file << "time_ms,left_cmd_torque,right_cmd_torque,fl_vel,fr_vel,robot_vel\n";
+    log_file << "time_ms,left_cmd_torque,right_cmd_torque,fl_vel,fr_vel,robot_vel,yaw_rate,f_"
+                "traction_l,f_traction_r\n";
   }
 
   void TearDown() override { log_file.close(); }
@@ -258,8 +307,9 @@ protected:
                   << "\n";
       }
 
-      log_file << simulated_millis << "," << sim.fl.applied_torque << "," << sim.fr.applied_torque
-               << "," << sim.fl.velocity << "," << sim.fr.velocity << "," << sim.robot_velocity
+      log_file << simulated_millis << "," << sim.fl.applied_torque << "," << -sim.fr.applied_torque
+               << "," << sim.fl.velocity << "," << -sim.fr.velocity << "," << sim.robot_velocity
+               << "," << sim.robot_yaw_rate << "," << sim.f_traction_l << "," << sim.f_traction_r
                << "\n";
     }
   }
@@ -291,11 +341,11 @@ TEST_F( MotorControllerTest, NormalGroundMovement )
 
 TEST_F( MotorControllerTest, StairClimbingSlip )
 {
-  // Start moving
+  // Start moving fast
   MotorCommand cmd;
   cmd.mode = MotorCommand::MotorMode::VELOCITY;
-  cmd.left = 5.0f;
-  cmd.right = 5.0f;
+  cmd.left = 10.0f;
+  cmd.right = 10.0f;
   controller.setCommand( cmd );
 
   step( 1000 );
@@ -303,18 +353,33 @@ TEST_F( MotorControllerTest, StairClimbingSlip )
   // Hit a stair (friction drops drastically)
   sim.stairs_mode = true;
 
-  step( 500 );
+  step( 1500 );
 
-  // Expected behaviour: motor may accelerate briefly due to slip,
-  // but the controller should back off torque so it doesn't spin wildly out of control.
-  // The peak torque shouldn't explode.
-  EXPECT_LT( std::abs( sim.fl.applied_torque ), 30.0f );
+  // Expected behaviour: slip detection should trigger and clamp torque
+  EXPECT_TRUE( sim.slipping_on_stairs );
+  EXPECT_LT( std::abs( sim.fl.applied_torque ), 10.0f ); // Clamped near f_c
 
   sim.stairs_mode = false;
   step( 2000 );
 
   // Should recover to normal speed
-  EXPECT_NEAR( sim.fl.velocity, 5.0f, 0.6f );
+  EXPECT_NEAR( sim.fl.velocity, 10.0f, 1.2f );
+}
+
+TEST_F( MotorControllerTest, SpinningInPlace )
+{
+  // Spin right (Left forward, Right backward)
+  MotorCommand cmd;
+  cmd.mode = MotorCommand::MotorMode::VELOCITY;
+  cmd.left = 5.0f;
+  cmd.right = -5.0f;
+  controller.setCommand( cmd );
+
+  step( 2000 );
+
+  // Should have high yaw rate but low longitudinal velocity
+  EXPECT_GT( std::abs( sim.robot_yaw_rate ), 1.0f );
+  EXPECT_NEAR( sim.robot_velocity, 0.0f, 0.2f );
 }
 
 TEST_F( MotorControllerTest, SlowStairClimbing )

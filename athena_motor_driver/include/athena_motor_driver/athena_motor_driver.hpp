@@ -63,18 +63,9 @@ private:
   std::string port_name_ = "/dev/tty_drive_motor_controller";
   int baud_rate_ = 115200;
   double wheel_radius_ = 0.07;
-  PIDGains left_velocity_pid_gains_;
-  PIDGains right_velocity_pid_gains_;
-  PIDGains left_position_pid_gains_;
-  PIDGains right_position_pid_gains_;
-  // Feed-forward control parameters for velocity control
-  float left_velocity_feed_forward_k_v_ = 0.0f;
-  float left_velocity_feed_forward_k_s_ = 0.0f;
-  float right_velocity_feed_forward_k_v_ = 0.0f;
-  float right_velocity_feed_forward_k_s_ = 0.0f;
-  float left_velocity_feed_forward_k_s_rotational_ = 0.0f;
-  float right_velocity_feed_forward_k_s_rotational_ = 0.0f;
-  bool pid_updated_ = false;
+  LadrcGains left_ladrc_gains_;
+  LadrcGains right_ladrc_gains_;
+  bool ladrc_updated_ = false;
   bool debug_ = false;
   bool disable_acceleration_limiting_ = false;
   bool torque_mode_ = false;

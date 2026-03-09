@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Athena Motor Log Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1115;
+            --surface: #1a1d23;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.5; }
+        header { padding: 1rem 1.5rem; text-align: center; border-bottom: 1px solid var(--border); background: rgba(26, 29, 35, 0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
+        h1 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+
+        #drop-zone { border: 2px dashed var(--border); border-radius: 1rem; padding: 2.5rem; text-align: center; transition: all 0.3s; background: var(--surface); cursor: pointer; margin-bottom: 1rem; display: block; }
+        #drop-zone:hover { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-glow); }
+        #drop-zone strong { color: var(--accent); font-size: 1.1rem; display: block; margin-bottom: 0.25rem; }
+        #drop-zone p { font-size: 0.9rem; color: var(--text-dim); }
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 1rem; display: flex; flex-direction: column; min-height: 380px; }
+        .chart-card.full { grid-column: 1 / -1; }
+        .chart-header { margin-bottom: 0.75rem; font-family: 'Outfit', sans-serif; font-size: 1rem; color: var(--text-dim); border-left: 3px solid var(--accent); padding-left: 0.75rem; }
+        .chart-container { flex-grow: 1; position: relative; min-height: 0; }
+
+        .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .stat-item { background: var(--surface); border: 1px solid var(--border); border-radius: 0.8rem; padding: 0.75rem; text-align: center; }
+        .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 0.25rem; }
+        .stat-value { font-family: 'Outfit', sans-serif; font-size: 1.25rem; color: #fff; font-weight: 600; }
+
+        #file-input { display: none; }
+        .hidden { display: none; }
+
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .chart-card.full { grid-column: auto; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Athena Motor Log Viewer</h1>
+    </header>
+
+    <div class="container">
+        <label id="drop-zone">
+            <input type="file" id="file-input" accept=".csv">
+            <strong>Drop Test Log Here</strong>
+            <p>Support for 2D dynamics, traction forces, and yaw rate</p>
+        </label>
+
+        <div id="dashboard" class="hidden">
+            <div class="stats-bar">
+                <div class="stat-item"><div class="stat-label">Duration</div><div id="stat-duration" class="stat-value">-</div></div>
+                <div class="stat-item"><div class="stat-label">Max Velocity</div><div id="stat-max-vel" class="stat-value">-</div></div>
+                <div class="stat-item"><div class="stat-label">Peak Torque</div><div id="stat-peak-torque" class="stat-value">-</div></div>
+                <div class="stat-item"><div class="stat-label">Peak Traction</div><div id="stat-peak-force" class="stat-value">-</div></div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="chart-card full">
+                    <div class="chart-header">Velocity Dynamics (Rad/s & M/s)</div>
+                    <div class="chart-container">
+                        <canvas id="velocity-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">Angular Rate (Rad/s)</div>
+                    <div class="chart-container">
+                        <canvas id="yaw-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">Torque Commands (Nm)</div>
+                    <div class="chart-container">
+                        <canvas id="torque-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-header">Traction Forces (N) - Interaction with Ground</div>
+                    <div class="chart-container">
+                        <canvas id="force-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dashboard = document.getElementById('dashboard');
+        let charts = {};
+
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) Papa.parse(file, { header: true, dynamicTyping: true, complete: (res) => render(res.data) });
+        };
+
+        const colors = { blue: '#3b82f6', rose: '#f43f5e', emerald: '#10b981', amber: '#f59e0b', violet: '#8b5cf6', white: '#fff' };
+
+        function render(data) {
+            dashboard.classList.remove('hidden');
+            const clean = data.filter(d => d.time_ms != null);
+            const time = clean.map(d => d.time_ms);
+
+            const get = (key) => clean.map(d => d[key] ?? 0);
+            const safeMax = (arr) => Math.max(...arr.map(Math.abs));
+
+            document.getElementById('stat-duration').textContent = time[time.length-1] + 'ms';
+            document.getElementById('stat-max-vel').textContent = safeMax(get('fl_vel')).toFixed(2) + ' rad/s';
+            document.getElementById('stat-peak-torque').textContent = safeMax(get('left_cmd_torque')).toFixed(2) + ' Nm';
+            document.getElementById('stat-peak-force').textContent = safeMax(get('f_traction_l')).toFixed(2) + ' N';
+
+            Object.values(charts).forEach(c => c.destroy());
+
+            const opts = (title, yAxis = '') => ({
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12 } } },
+                scales: { 
+                    x: { type: 'linear', grid: { color: '#26292e' }, ticks: { color: '#64748b' } },
+                    y: { grid: { color: '#26292e' }, ticks: { color: '#64748b' }, title: { display: !!yAxis, text: yAxis, color: '#64748b' } }
+                }
+            });
+
+            charts.vel = new Chart(document.getElementById('velocity-chart'), {
+                type: 'line',
+                data: { labels: time, datasets: [
+                    { label: 'FL Vel (rad/s)', data: get('fl_vel'), borderColor: colors.blue, borderWidth: 2, radius: 0 },
+                    { label: 'FR Vel (rad/s)', data: get('fr_vel'), borderColor: colors.rose, borderWidth: 2, radius: 0 },
+                    { label: 'Robot Body (m/s)', data: get('robot_vel'), borderColor: colors.white, borderWidth: 3, radius: 0, borderDash: [5,5] }
+                ]},
+                options: opts('Velocity Dynamics')
+            });
+
+            charts.yaw = new Chart(document.getElementById('yaw-chart'), {
+                type: 'line',
+                data: { labels: time, datasets: [
+                    { label: 'Yaw Rate', data: get('yaw_rate'), borderColor: colors.violet, borderWidth: 2, radius: 0 }
+                ]},
+                options: opts('Angular Rate')
+            });
+
+            charts.torque = new Chart(document.getElementById('torque-chart'), {
+                type: 'line',
+                data: { labels: time, datasets: [
+                    { label: 'L Torque', data: get('left_cmd_torque'), borderColor: colors.emerald, borderWidth: 2, radius: 0 },
+                    { label: 'R Torque', data: get('right_cmd_torque'), borderColor: colors.amber, borderWidth: 2, radius: 0 }
+                ]},
+                options: opts('Torque Commands')
+            });
+
+            charts.force = new Chart(document.getElementById('force-chart'), {
+                type: 'line',
+                data: { labels: time, datasets: [
+                    { label: 'L Traction Force', data: get('f_traction_l'), borderColor: colors.blue, borderWidth: 1.5, radius: 0 },
+                    { label: 'R Traction Force', data: get('f_traction_r'), borderColor: colors.rose, borderWidth: 1.5, radius: 0 }
+                ]},
+                options: opts('Traction Forces')
+            });
+        }
+    </script>
+</body>
+</html>

@@ -18,38 +18,29 @@ void MotorController::init( std::shared_ptr<MotorComm> front_comm,
 
 void MotorController::setCommand( const MotorCommand &command ) { command_ = command; }
 
-void MotorController::setPositionPIDGains( const PIDGains &left_pid_gains,
-                                           const PIDGains &right_pid_gains )
+void MotorController::setLadrcGains( const LadrcGains &left_gains, const LadrcGains &right_gains )
 {
-  left_.setPositionPIDGains( left_pid_gains.k_p, left_pid_gains.k_i, left_pid_gains.k_d );
-  right_.setPositionPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d );
-}
+  auto l_cfg = left_.getLadrcConfig();
+  l_cfg.b0 = left_gains.b0;
+  l_cfg.omega_c = left_gains.omega_c;
+  l_cfg.omega_o = left_gains.omega_o;
+  l_cfg.kp_pos = left_gains.kp_pos;
+  l_cfg.f_c = left_gains.f_c;
+  l_cfg.f_s = left_gains.f_s;
+  l_cfg.slip_torque_threshold = left_gains.slip_torque_threshold;
+  l_cfg.slip_vel_threshold = left_gains.slip_vel_threshold;
+  left_.setLadrcConfig( l_cfg );
 
-void MotorController::setVelocityPIDGains( const PIDGains &left_pid_gains,
-                                           const PIDGains &right_pid_gains )
-{
-  left_.setVelocityPIDGains( left_pid_gains.k_p, left_pid_gains.k_i, left_pid_gains.k_d );
-  right_.setVelocityPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d );
-}
-
-void MotorController::setVelocityFeedForwardGains( float left_k_v, float left_k_s, float right_k_v,
-                                                   float right_k_s )
-{
-  left_.setVelocityFeedForwardGains( left_k_v, left_k_s );
-  right_.setVelocityFeedForwardGains( right_k_v, right_k_s );
-}
-
-void MotorController::setPositionFeedForwardGains( float left_k_v, float left_k_s, float right_k_v,
-                                                   float right_k_s )
-{
-  left_.setPositionFeedForwardGains( left_k_v, left_k_s );
-  right_.setPositionFeedForwardGains( right_k_v, right_k_s );
-}
-
-void MotorController::setRotationalFeedForwardGains( float left_k_s, float right_k_s )
-{
-  rotational_feed_forward_k_s_left_ = left_k_s;
-  rotational_feed_forward_k_s_right_ = right_k_s;
+  auto r_cfg = right_.getLadrcConfig();
+  r_cfg.b0 = right_gains.b0;
+  r_cfg.omega_c = right_gains.omega_c;
+  r_cfg.omega_o = right_gains.omega_o;
+  r_cfg.kp_pos = right_gains.kp_pos;
+  r_cfg.f_c = right_gains.f_c;
+  r_cfg.f_s = right_gains.f_s;
+  r_cfg.slip_torque_threshold = right_gains.slip_torque_threshold;
+  r_cfg.slip_vel_threshold = right_gains.slip_vel_threshold;
+  right_.setLadrcConfig( r_cfg );
 }
 
 void MotorController::stop()
@@ -183,15 +174,21 @@ void MotorController::computeMotorCommands( MotorCommCommand &left_command,
     velocity_.right = 0;
     left_command.mode = MotorMode::BRAKE;
     right_command.mode = MotorMode::BRAKE;
+    left_command.torque = 0;
+    right_command.torque = 0;
     // Reset all PID controllers so it will not try to jump back to a position when power is restored
-    left_.resetPIDControllers();
-    right_.resetPIDControllers();
+    left_.resetControllers();
+    right_.resetControllers();
+    left_.setAppliedTorque( 0 );
+    right_.setAppliedTorque( 0 );
     initialized_position_ = false;
     debug_data_.error = MotorDebugData::Error::NO_MOTOR_STATUS;
   } else {
     Torque torque = computeTorque();
     setCommandFromTorque( left_command, initialized_position_ ? torque.left : 0 );
     setCommandFromTorque( right_command, initialized_position_ ? torque.right : 0 );
+    left_.setAppliedTorque( left_command.mode == MotorMode::FOC ? left_command.torque : 0 );
+    right_.setAppliedTorque( right_command.mode == MotorMode::FOC ? right_command.torque : 0 );
   }
   time_since_last_command_ = 0;
 }
@@ -284,25 +281,34 @@ const FullMotorStatus &MotorController::update()
 {
   debug_data_.error = MotorDebugData::Error::NO_ERROR;
 
-  MotorCommCommand left_command;
-  MotorCommCommand right_command;
-  computeMotorCommands( left_command, right_command );
-
   const bool front_working =
       left_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.frontAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
   const bool rear_working =
       left_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
 
-  sendReceiveBus( front_motor_comm_, reset_skip_count_front_, left_command, right_command,
+  // 1. Actuate and Sense (Send previous block's command, get newest feedback)
+  sendReceiveBus( front_motor_comm_, reset_skip_count_front_, left_command_, right_command_,
                   front_working, true );
-  sendReceiveBus( rear_motor_comm_, reset_skip_count_rear_, left_command, right_command,
+  sendReceiveBus( rear_motor_comm_, reset_skip_count_rear_, left_command_, right_command_,
                   rear_working, false );
 
+  // 2. Filter and Update state
+  // Using newest measurements and the torque that just finished physical application
   tryInitializePosition();
   left_.addMeasurements();
   right_.addMeasurements();
 
-  assembleMotorStatus( left_command, right_command );
+  if ( initialized_position_ ) {
+    left_.updateObserver();
+    right_.updateObserver();
+  }
+
+  // 3. Compute control laws for the NEXT tick
+  computeMotorCommands( left_command_, right_command_ );
+
+  // 4. Telemetry
+  assembleMotorStatus( left_command_, right_command_ );
+
   collectDebugData();
 
   return motor_status_;

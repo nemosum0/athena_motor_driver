@@ -82,7 +82,7 @@ void AthenaMotorDriver::setupSerial()
                  baud_rate_ );
     cross_talker_ =
         std::make_unique<CrossTalker>( std::make_unique<crosstalk::LibSerialWrapper>( *serial_ ) );
-    pid_updated_ = true; // Force PID update on first run
+    ladrc_updated_ = true; // Force LADRC update on first run
     updateSettings();
   } catch ( const std::exception &e ) {
     RCLCPP_ERROR( get_logger(), "Failed to initialize serial port: %s", e.what() );
@@ -149,40 +149,23 @@ void AthenaMotorDriver::update()
                                              << crosstalk::to_string( result ) );
     }
 
-    if ( pid_updated_ ) {
-      pid_updated_ = false;
-      ChangePIDGainsCommand command( left_velocity_pid_gains_, right_velocity_pid_gains_,
-                                     left_position_pid_gains_, right_position_pid_gains_ );
-      command.left_velocity_feed_forward_k_v = left_velocity_feed_forward_k_v_;
-      command.left_velocity_feed_forward_k_s = left_velocity_feed_forward_k_s_;
-      command.right_velocity_feed_forward_k_v = right_velocity_feed_forward_k_v_;
-      command.right_velocity_feed_forward_k_s = right_velocity_feed_forward_k_s_;
-      command.left_velocity_feed_forward_k_s_rotational = left_velocity_feed_forward_k_s_rotational_;
-      command.right_velocity_feed_forward_k_s_rotational =
-          right_velocity_feed_forward_k_s_rotational_;
+    if ( ladrc_updated_ ) {
+      ladrc_updated_ = false;
+      ChangeLadrcGainsCommand command( left_ladrc_gains_, right_ladrc_gains_ );
       auto result = cross_talker_->sendObject( command );
       if ( result == crosstalk::WriteResult::Success ) {
-        RCLCPP_INFO( get_logger(), "Sending request to update PID Gains." );
+        RCLCPP_INFO( get_logger(), "Sending request to update LADRC Gains." );
         RCLCPP_INFO( get_logger(),
-                     "Velocity:\n  Left: k_p=%f, K_i=%f, k_d=%f\n  Right: k_p=%f, K_i=%f, k_d=%f",
-                     left_velocity_pid_gains_.k_p, left_velocity_pid_gains_.k_i,
-                     left_velocity_pid_gains_.k_d, right_velocity_pid_gains_.k_p,
-                     right_velocity_pid_gains_.k_i, right_velocity_pid_gains_.k_d );
-        RCLCPP_INFO( get_logger(),
-                     "Position:\n  Left: k_p=%f, K_i=%f, k_d=%f\n  Right: k_p=%f, K_i=%f, k_d=%f",
-                     left_position_pid_gains_.k_p, left_position_pid_gains_.k_i,
-                     left_position_pid_gains_.k_d, right_position_pid_gains_.k_p,
-                     right_position_pid_gains_.k_i, right_position_pid_gains_.k_d );
-        RCLCPP_INFO( get_logger(),
-                     "Velocity Feed-Forward:\n  Left: k_v=%f, k_s=%f, k_s_rotational=%f\n  Right: "
-                     "k_v=%f, k_s=%f, k_s_rotational=%f",
-                     left_velocity_feed_forward_k_v_, left_velocity_feed_forward_k_s_,
-                     left_velocity_feed_forward_k_s_rotational_, right_velocity_feed_forward_k_v_,
-                     right_velocity_feed_forward_k_s_, right_velocity_feed_forward_k_s_rotational_ );
-        RCLCPP_INFO( get_logger(), "You should see 'PID Gains updated.' next, if it worked." );
+                     "LADRC:\n  Left: b0=%f, omega_c=%f, omega_o=%f, kp_pos=%f, f_c=%f, f_s=%f\n  "
+                     "Right: b0=%f, omega_c=%f, omega_o=%f, kp_pos=%f, f_c=%f, f_s=%f",
+                     left_ladrc_gains_.b0, left_ladrc_gains_.omega_c, left_ladrc_gains_.omega_o,
+                     left_ladrc_gains_.kp_pos, left_ladrc_gains_.f_c, left_ladrc_gains_.f_s,
+                     right_ladrc_gains_.b0, right_ladrc_gains_.omega_c, right_ladrc_gains_.omega_o,
+                     right_ladrc_gains_.kp_pos, right_ladrc_gains_.f_c, right_ladrc_gains_.f_s );
+        RCLCPP_INFO( get_logger(), "You should see 'LADRC Gains updated.' next, if it worked." );
 
       } else {
-        RCLCPP_ERROR_STREAM( get_logger(), "Failed to send ChangePIDGainsCommand object. Error:"
+        RCLCPP_ERROR_STREAM( get_logger(), "Failed to send ChangeLadrcGainsCommand object. Error:"
                                                << crosstalk::to_string( result ) );
       }
     }
@@ -248,8 +231,8 @@ void AthenaMotorDriver::update()
                                                    << crosstalk::to_string( result ) );
           continue;
         }
-        if ( ack.type == CommandType::CHANGE_PID_GAINS ) {
-          RCLCPP_INFO( get_logger(), "PID gains updated." );
+        if ( ack.type == CommandType::CHANGE_LADRC_GAINS ) {
+          RCLCPP_INFO( get_logger(), "LADRC gains updated." );
         } else if ( ack.type == CommandType::UPDATE_SETTINGS ) {
           RCLCPP_INFO( get_logger(), "Settings updated." );
         } else if ( ack.type == CommandType::TEENSY_REBOOT ) {
@@ -357,64 +340,51 @@ void AthenaMotorDriver::declareMicroControllerParameters()
       "Use torque commands instead of velocity commands (ignores cmd_vel topic when active)" );
   declare_reconfigurable_parameter( "invert_forward_direction", std::ref( invert_forward_direction_ ),
                                     "Invert the forward direction of the robot" );
-  hector::ParameterOptions<float> pid_options =
+
+  hector::ParameterOptions<float> ladrc_options =
       hector::ParameterOptions<float>()
           .onValidate( []( const auto &value ) { return value >= 0; } )
-          .onUpdate( [this]( const auto & ) { pid_updated_ = true; } );
-  declare_reconfigurable_parameter( "left_velocity_pid.k_p", std::ref( left_velocity_pid_gains_.k_p ),
-                                    "Left P-Gain", pid_options );
-  declare_reconfigurable_parameter( "left_velocity_pid.k_i", std::ref( left_velocity_pid_gains_.k_i ),
-                                    "Left I-Gain", pid_options );
-  declare_reconfigurable_parameter( "left_velocity_pid.k_d", std::ref( left_velocity_pid_gains_.k_d ),
-                                    "Left D-Gain", pid_options );
-  declare_reconfigurable_parameter( "right_velocity_pid.k_p",
-                                    std::ref( right_velocity_pid_gains_.k_p ), "Right P-Gain",
-                                    pid_options );
-  declare_reconfigurable_parameter( "right_velocity_pid.k_i",
-                                    std::ref( right_velocity_pid_gains_.k_i ), "Right I-Gain",
-                                    pid_options );
-  declare_reconfigurable_parameter( "right_velocity_pid.k_d",
-                                    std::ref( right_velocity_pid_gains_.k_d ), "Right D-Gain",
-                                    pid_options );
+          .onUpdate( [this]( const auto & ) { ladrc_updated_ = true; } );
 
-  declare_reconfigurable_parameter( "left_position_pid.k_p", std::ref( left_position_pid_gains_.k_p ),
-                                    "Left P-Gain", pid_options );
-  declare_reconfigurable_parameter( "left_position_pid.k_i", std::ref( left_position_pid_gains_.k_i ),
-                                    "Left I-Gain", pid_options );
-  declare_reconfigurable_parameter( "left_position_pid.k_d", std::ref( left_position_pid_gains_.k_d ),
-                                    "Left D-Gain", pid_options );
-  declare_reconfigurable_parameter( "right_position_pid.k_p",
-                                    std::ref( right_position_pid_gains_.k_p ), "Right P-Gain",
-                                    pid_options );
-  declare_reconfigurable_parameter( "right_position_pid.k_i",
-                                    std::ref( right_position_pid_gains_.k_i ), "Right I-Gain",
-                                    pid_options );
-  declare_reconfigurable_parameter( "right_position_pid.k_d",
-                                    std::ref( right_position_pid_gains_.k_d ), "Right D-Gain",
-                                    pid_options );
+  // Left LADRC parameters
+  declare_reconfigurable_parameter( "left_ladrc.b0", std::ref( left_ladrc_gains_.b0 ),
+                                    "Left LADRC b0 (system gain)", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.omega_c", std::ref( left_ladrc_gains_.omega_c ),
+                                    "Left LADRC omega_c (controller bandwidth)", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.omega_o", std::ref( left_ladrc_gains_.omega_o ),
+                                    "Left LADRC omega_o (observer bandwidth)", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.kp_pos", std::ref( left_ladrc_gains_.kp_pos ),
+                                    "Left LADRC position hold gain", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.f_c", std::ref( left_ladrc_gains_.f_c ),
+                                    "Left LADRC Coulomb friction feedforward", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.f_s", std::ref( left_ladrc_gains_.f_s ),
+                                    "Left LADRC static friction breakaway assist", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.slip_torque_threshold",
+                                    std::ref( left_ladrc_gains_.slip_torque_threshold ),
+                                    "Left LADRC slip torque threshold", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.slip_vel_threshold",
+                                    std::ref( left_ladrc_gains_.slip_vel_threshold ),
+                                    "Left LADRC slip velocity threshold", ladrc_options );
 
-  // Feed-forward control parameters for velocity control
-  // Use the same pid_options which includes onUpdate callback that sets pid_updated_ = true
-  declare_reconfigurable_parameter( "left_velocity_feed_forward.k_v",
-                                    std::ref( left_velocity_feed_forward_k_v_ ),
-                                    "Left velocity feed-forward velocity gain", pid_options );
-  declare_reconfigurable_parameter( "left_velocity_feed_forward.k_s",
-                                    std::ref( left_velocity_feed_forward_k_s_ ),
-                                    "Left velocity feed-forward static friction gain", pid_options );
-  declare_reconfigurable_parameter( "right_velocity_feed_forward.k_v",
-                                    std::ref( right_velocity_feed_forward_k_v_ ),
-                                    "Right velocity feed-forward velocity gain", pid_options );
-  declare_reconfigurable_parameter( "right_velocity_feed_forward.k_s",
-                                    std::ref( right_velocity_feed_forward_k_s_ ),
-                                    "Right velocity feed-forward static friction gain", pid_options );
-  declare_reconfigurable_parameter( "left_velocity_feed_forward.k_s_rotational",
-                                    std::ref( left_velocity_feed_forward_k_s_rotational_ ),
-                                    "Left velocity feed-forward rotational static friction gain",
-                                    pid_options );
-  declare_reconfigurable_parameter( "right_velocity_feed_forward.k_s_rotational",
-                                    std::ref( right_velocity_feed_forward_k_s_rotational_ ),
-                                    "Right velocity feed-forward rotational static friction gain",
-                                    pid_options );
+  // Right LADRC parameters
+  declare_reconfigurable_parameter( "right_ladrc.b0", std::ref( right_ladrc_gains_.b0 ),
+                                    "Right LADRC b0 (system gain)", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.omega_c", std::ref( right_ladrc_gains_.omega_c ),
+                                    "Right LADRC omega_c (controller bandwidth)", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.omega_o", std::ref( right_ladrc_gains_.omega_o ),
+                                    "Right LADRC omega_o (observer bandwidth)", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.kp_pos", std::ref( right_ladrc_gains_.kp_pos ),
+                                    "Right LADRC position hold gain", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.f_c", std::ref( right_ladrc_gains_.f_c ),
+                                    "Right LADRC Coulomb friction feedforward", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.f_s", std::ref( right_ladrc_gains_.f_s ),
+                                    "Right LADRC static friction breakaway assist", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.slip_torque_threshold",
+                                    std::ref( right_ladrc_gains_.slip_torque_threshold ),
+                                    "Right LADRC slip torque threshold", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.slip_vel_threshold",
+                                    std::ref( right_ladrc_gains_.slip_vel_threshold ),
+                                    "Right LADRC slip velocity threshold", ladrc_options );
 }
 
 } // namespace athena_motor_driver

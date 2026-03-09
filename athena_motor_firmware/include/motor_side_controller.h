@@ -2,16 +2,15 @@
 
 #include "athena_motor_interface/athena_motor_interfaces.h"
 #include "config.h"
+#include "ladrc_controller.h"
 #include "math/mean_filter.h"
-#include "pid_controller.h"
 #include "position_measurement_filter.hpp"
-#include "velocity_measurement_filter.hpp"
 #include <elapsedMillis.h>
 
 struct MotorCommStatus;
 
-//! Manages the status, filtering, and PID control for one side (left or right) of the robot.
-//! Each side has a front and rear motor whose measurements are fused for position and velocity.
+//! Manages the status, filtering, and control for one side (left or right) of the robot.
+//! Each side has a front and rear motor whose measurements are fused for position.
 class MotorSideController
 {
 public:
@@ -23,7 +22,7 @@ public:
   /// Update raw motor status from rear comm result
   void updateRearStatus( const MotorCommStatus &status, uint8_t expected_motor_id );
 
-  /// Feed current front/rear status to position and velocity filters
+  /// Feed current front/rear status to position filters
   void addMeasurements();
 
   /// Check if at least one motor (front or rear) is responding within timeout
@@ -35,20 +34,25 @@ public:
   /// Capture current filtered position as the hold position
   void initializePosition();
 
-  /// Compute torque output for the given target velocity using position/velocity PID
+  /// Updates the ESO. Must be called every tick.
+  void updateObserver();
+
+  /// Compute torque output for the given target velocity
   float computeTorque( float target_velocity );
 
-  /// Reset all PID controllers (e.g., on communication loss)
-  void resetPIDControllers();
+  /// Record actual torque applied to motors
+  void setAppliedTorque( float torque );
 
-  // --- Gain setters ---
-  void setPositionPIDGains( float kp, float ki, float kd );
-  void setVelocityPIDGains( float kp, float ki, float kd );
-  void setVelocityFeedForwardGains( float k_v, float k_s );
-  void setPositionFeedForwardGains( float k_v, float k_s );
+  /// Reset controllers (e.g., on communication loss)
+  void resetControllers();
+
+  // --- Configuration setters ---
+  void setLadrcConfig( const LadrcController::Config &config );
+
+  LadrcController::Config getLadrcConfig() const { return ladrc_.getConfig(); }
 
   // --- Accessors ---
-  float filteredVelocity() const { return velocity_filter_.getFiltered(); }
+  float filteredVelocity() const { return ladrc_.getX2Hat(); }
 
   const MotorStatus &frontStatus() const { return front_status_; }
 
@@ -59,9 +63,9 @@ public:
   unsigned long rearAgeMs() const { return rear_age_; }
 
   // --- Debug ---
-  const PIDDebugData &velocityPIDDebugData() const { return velocity_pid_.debugData(); }
+  const PIDDebugData &velocityPIDDebugData() const { return ladrc_.velocityDebugData(); }
 
-  const PIDDebugData &positionPIDDebugData() const { return position_pid_.debugData(); }
+  const PIDDebugData &positionPIDDebugData() const { return ladrc_.positionDebugData(); }
 
   float validFrontFreq( long age_ms ) const;
   float validRearFreq( long age_ms ) const;
@@ -71,8 +75,6 @@ private:
                      MotorStatus &out_status, MeanFilter<uint8_t, VALID_FILTER_SIZE> &valid_filter,
                      elapsedMillis &age );
 
-  enum class ControlMode { POSITION, VELOCITY };
-
   MotorStatus front_status_;
   MotorStatus rear_status_;
   elapsedMillis front_age_;
@@ -81,10 +83,5 @@ private:
   MeanFilter<uint8_t, VALID_FILTER_SIZE> rear_valid_;
 
   PositionMeasurementFilter position_filter_;
-  VelocityMeasurementFilter velocity_filter_;
-  PIDController velocity_pid_;
-  PIDController position_pid_;
-
-  ControlMode control_mode_ = ControlMode::POSITION;
-  float hold_position_ = 0;
+  LadrcController ladrc_;
 };

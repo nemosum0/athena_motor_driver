@@ -9,7 +9,7 @@ enum class CommandType : uint8_t {
   INVALID = 0,
   MOTOR_COMMAND = 1,
   MOTOR_ERROR = 2,
-  CHANGE_PID_GAINS = 3,
+  CHANGE_LADRC_GAINS = 3,
   MOTOR_STATUS = 4,
   FULL_MOTOR_STATUS = 5,
   UPDATE_SETTINGS = 6,
@@ -63,54 +63,36 @@ struct MotorError {
 
 REFL_AUTO( type( MotorError, crosstalk::id( 2 ) ), field( error ) )
 
-struct PIDGains {
-  float k_p = 0.f;
-  float k_i = 0.f;
-  float k_d = 0.f;
+struct LadrcGains {
+  float b0 = 1.0f;
+  float omega_c = 40.0f;
+  float omega_o = 150.0f;
+  float kp_pos = 1600.0f;
+  float f_c = 0.5f;
+  float f_s = 1.0f;
+  float slip_torque_threshold = 5.0f;
+  float slip_vel_threshold = 1.0f;
 
-  PIDGains() = default;
-
-  PIDGains( float k_p, float k_i, float k_d ) : k_p( k_p ), k_i( k_i ), k_d( k_d ) { }
+  LadrcGains() = default;
 };
 
-REFL_AUTO( type( PIDGains ), field( k_p ), field( k_i ), field( k_d ) )
+REFL_AUTO( type( LadrcGains ), field( b0 ), field( omega_c ), field( omega_o ), field( kp_pos ),
+           field( f_c ), field( f_s ), field( slip_torque_threshold ), field( slip_vel_threshold ) )
 
-struct ChangePIDGainsCommand {
-  PIDGains left_velocity_pid_gains;
-  PIDGains right_velocity_pid_gains;
-  PIDGains left_position_pid_gains;
-  PIDGains right_position_pid_gains;
-  // Feed-forward control parameters for velocity control
-  // k_v: Velocity gain - proportional to target velocity
-  // k_s: Static friction gain - constant "push" to overcome static friction
-  float left_velocity_feed_forward_k_v = 0.0f;
-  float left_velocity_feed_forward_k_s = 0.0f;
-  float right_velocity_feed_forward_k_v = 0.0f;
-  float right_velocity_feed_forward_k_s = 0.0f;
-  float left_velocity_feed_forward_k_s_rotational = 0.0f;
-  float right_velocity_feed_forward_k_s_rotational = 0.0f;
+struct ChangeLadrcGainsCommand {
+  LadrcGains left_gains;
+  LadrcGains right_gains;
 
-  ChangePIDGainsCommand() = default;
+  ChangeLadrcGainsCommand() = default;
 
-  ChangePIDGainsCommand( const PIDGains &left_velocity_pid_gains,
-                         const PIDGains &right_velocity_pid_gains,
-                         const PIDGains &left_position_pid_gains,
-                         const PIDGains &right_position_pid_gains )
-      : left_velocity_pid_gains( left_velocity_pid_gains ),
-        right_velocity_pid_gains( right_velocity_pid_gains ),
-        left_position_pid_gains( left_position_pid_gains ),
-        right_position_pid_gains( right_position_pid_gains )
+  ChangeLadrcGainsCommand( const LadrcGains &left, const LadrcGains &right )
+      : left_gains( left ), right_gains( right )
   {
   }
 };
 
-REFL_AUTO( type( ChangePIDGainsCommand, crosstalk::id( 3 ) ), field( left_velocity_pid_gains ),
-           field( right_velocity_pid_gains ), field( left_position_pid_gains ),
-           field( right_position_pid_gains ), field( left_velocity_feed_forward_k_v ),
-           field( left_velocity_feed_forward_k_s ), field( right_velocity_feed_forward_k_v ),
-           field( right_velocity_feed_forward_k_s ),
-           field( left_velocity_feed_forward_k_s_rotational ),
-           field( right_velocity_feed_forward_k_s_rotational ) )
+REFL_AUTO( type( ChangeLadrcGainsCommand, crosstalk::id( 3 ) ), field( left_gains ),
+           field( right_gains ) )
 
 struct MotorStatus {
   enum class Error : uint8_t {
