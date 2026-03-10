@@ -5,6 +5,7 @@
     wheel_separation: 1.248
     rotational_amplification: 4.0
     wheel_radius: 0.075
+    angular_velocity_limit: 0.06
     left_velocity_pid.k_p: 5.0
     left_velocity_pid.k_i: 0.0
     left_velocity_pid.k_d: 0.0
