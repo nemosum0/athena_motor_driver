@@ -56,14 +56,11 @@ private:
     Torque() = default;
   };
 
-  Torque computeTorque();
-  void computeMotorCommands( MotorCommCommand &left_command, MotorCommCommand &right_command );
-  void sendReceiveBus( std::shared_ptr<MotorComm> &comm, int &reset_skip_count,
-                       const MotorCommCommand &left_command, const MotorCommCommand &right_command,
-                       bool bus_working, bool is_front );
+  Torque computeTorque( float dt );
+  void computeMotorCommands( float dt );
+  void sendReceiveBothBuses( bool front_working, bool rear_working );
   void tryInitializePosition();
-  void assembleMotorStatus( const MotorCommCommand &left_command,
-                            const MotorCommCommand &right_command );
+  void assembleMotorStatus();
   void collectDebugData();
 
   struct Velocity {
@@ -72,6 +69,8 @@ private:
   };
 
   MotorCommand command_;
+  MotorCommCommand left_command_;
+  MotorCommCommand right_command_;
   Velocity target_velocity_;
   Torque torque_;
   Velocity velocity_;

@@ -17,7 +17,7 @@
 // ============================================================
 // Timing
 // ============================================================
-static constexpr int MAIN_LOOP_PERIOD_US = 2000;   // 500 Hz control loop
+static constexpr int MAIN_LOOP_PERIOD_US = 1000;   // 1000 Hz control loop
 static constexpr int COMMAND_TIMEOUT_MS = 200;     // Stop motors if no host command
 static constexpr int MOTOR_STATUS_TIMEOUT_MS = 20; // Motor considered dead
 static constexpr int STARTUP_DELAY_MS = 20;

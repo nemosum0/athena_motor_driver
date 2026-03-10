@@ -36,7 +36,7 @@ public:
   void initializePosition();
 
   /// Compute torque output for the given target velocity using position/velocity PID
-  float computeTorque( float target_velocity );
+  float computeTorque( float target_velocity, float dt );
 
   /// Reset all PID controllers (e.g., on communication loss)
   void resetPIDControllers();

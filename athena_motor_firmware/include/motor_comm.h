@@ -48,6 +48,11 @@ public:
   void sendReceive( const MotorCommCommand &left_command, const MotorCommCommand &right_command,
                     MotorCommStatus &left_status, MotorCommStatus &right_status );
 
+  //! Send a command packet without waiting for a response.
+  void sendCommand( const MotorCommCommand &command );
+  //! Read a status response packet. Must be called after sendCommand().
+  MotorCommStatus receiveStatus();
+
   void resetComm()
   {
     serial_->clear();

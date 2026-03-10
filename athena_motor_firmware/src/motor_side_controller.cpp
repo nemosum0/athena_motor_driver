@@ -73,7 +73,7 @@ void MotorSideController::resetPositionFilter() { position_filter_.reset(); }
 
 void MotorSideController::initializePosition() { hold_position_ = position_filter_.getFiltered(); }
 
-float MotorSideController::computeTorque( float target_velocity )
+float MotorSideController::computeTorque( float target_velocity, float dt )
 {
   if ( std::abs( target_velocity ) < VELOCITY_DEAD_ZONE ) {
     if ( control_mode_ != ControlMode::POSITION ) {
@@ -83,14 +83,14 @@ float MotorSideController::computeTorque( float target_velocity )
       hold_position_ = position_filter_.getFiltered();
     }
     const float measured_position = position_filter_.getFiltered();
-    return position_pid_.computeTorque( hold_position_, measured_position );
+    return position_pid_.computeTorque( hold_position_, measured_position, dt );
   } else {
     if ( control_mode_ != ControlMode::VELOCITY ) {
       control_mode_ = ControlMode::VELOCITY;
       velocity_pid_.reset();
     }
     const float measured_velocity = velocity_filter_.getFiltered();
-    return velocity_pid_.computeTorque( target_velocity, measured_velocity );
+    return velocity_pid_.computeTorque( target_velocity, measured_velocity, dt );
   }
 }
 

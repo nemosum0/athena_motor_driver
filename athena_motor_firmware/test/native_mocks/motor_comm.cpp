@@ -10,3 +10,7 @@ MotorComm::MotorComm( HardwareSerialIMXRT *serial, int direction_pin, MotorType 
 MotorCommStatus MotorComm::readStatus() { return MotorCommStatus{}; }
 
 void MotorComm::writeData( const uint8_t *data, size_t size ) { }
+
+void MotorComm::sendCommand( const MotorCommCommand &command ) { }
+
+MotorCommStatus MotorComm::receiveStatus() { return MotorCommStatus{}; }

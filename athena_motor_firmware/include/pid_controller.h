@@ -20,13 +20,12 @@ public:
   void reset();
 
   //! Compute the torque required to reach the goal velocity
-  float computeTorque( float goal, float current );
+  float computeTorque( float goal, float current, float dt );
 
   const PIDDebugData &debugData() const { return debug_data_; }
 
 private:
   PIDDebugData debug_data_;
-  elapsedMicros elapsed_;
   float kp_;
   float ki_;
   float kd_;

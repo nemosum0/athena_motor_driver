@@ -36,10 +36,8 @@ void PIDController::reset()
   first_compute_ = true;
 }
 
-float PIDController::computeTorque( float goal, float current )
+float PIDController::computeTorque( float goal, float current, float dt )
 {
-  float dt = float( elapsed_ ) / 1E6f;
-  elapsed_ = 0;
   if ( first_compute_ ) {
     last_input_ = current;
     dt = 0;
