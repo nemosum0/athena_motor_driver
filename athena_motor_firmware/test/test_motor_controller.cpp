@@ -205,47 +205,52 @@ MotorCommStatus MotorComm::readStatus() { return MotorCommStatus{}; }
 
 void MotorComm::writeData( const uint8_t *data, size_t size ) { }
 
+static MotorCommCommand pending_command_front;
+static MotorCommCommand pending_command_rear;
+
+void MotorComm::sendCommand( const MotorCommCommand &command )
+{
+  auto &pending = ( this == front_comm.get() ) ? pending_command_front : pending_command_rear;
+  pending = command;
+
+  MotorState *m = nullptr;
+  if ( this == front_comm.get() )
+    m = ( command.motor_id == 0 ) ? &sim.fl : &sim.fr;
+  else
+    m = ( command.motor_id == 0 ) ? &sim.rl : &sim.rr;
+
+  m->applied_torque = command.mode == MotorMode::FOC ? command.torque : -m->velocity * 2.0f;
+}
+
+MotorCommStatus MotorComm::receiveStatus()
+{
+  auto delayed = sim.getDelayedState();
+  const auto &cmd = ( this == front_comm.get() ) ? pending_command_front : pending_command_rear;
+
+  MotorState *dm = nullptr;
+  if ( this == front_comm.get() )
+    dm = ( cmd.motor_id == 0 ) ? &delayed.fl : &delayed.fr;
+  else
+    dm = ( cmd.motor_id == 0 ) ? &delayed.rl : &delayed.rr;
+
+  MotorCommStatus status;
+  status.valid = true;
+  status.motor_id = cmd.motor_id;
+  status.mode = cmd.mode;
+  status.position = dm->position;
+  status.velocity_high = dm->velocity;
+  status.torque = dm->applied_torque;
+  return status;
+}
+
 void MotorComm::sendReceive( const MotorCommCommand &left_command,
                              const MotorCommCommand &right_command, MotorCommStatus &left_status,
                              MotorCommStatus &right_status )
 {
-
-  MotorState *ml = nullptr;
-  MotorState *mr = nullptr;
-
-  if ( this == front_comm.get() ) {
-    ml = &sim.fl;
-    mr = &sim.fr;
-  } else {
-    ml = &sim.rl;
-    mr = &sim.rr;
-  }
-
-  // Commands apply immediately (with jitter/latency it would be better to delay this too,
-  // but motor drivers usually have low TX latency).
-  ml->applied_torque =
-      left_command.mode == MotorMode::FOC ? left_command.torque : -ml->velocity * 2.0f;
-  mr->applied_torque =
-      right_command.mode == MotorMode::FOC ? right_command.torque : -mr->velocity * 2.0f;
-
-  // Status is delayed
-  auto delayed = sim.getDelayedState();
-  MotorState *dml = ( this == front_comm.get() ) ? &delayed.fl : &delayed.rl;
-  MotorState *dmr = ( this == front_comm.get() ) ? &delayed.fr : &delayed.rr;
-
-  left_status.valid = true;
-  left_status.motor_id = left_command.motor_id;
-  left_status.mode = left_command.mode;
-  left_status.position = dml->position;
-  left_status.velocity_high = dml->velocity;
-  left_status.torque = dml->applied_torque;
-
-  right_status.valid = true;
-  right_status.motor_id = right_command.motor_id;
-  right_status.mode = right_command.mode;
-  right_status.position = dmr->position;
-  right_status.velocity_high = dmr->velocity;
-  right_status.torque = dmr->applied_torque;
+  sendCommand( left_command );
+  left_status = receiveStatus();
+  sendCommand( right_command );
+  right_status = receiveStatus();
 }
 
 class MotorControllerTest : public ::testing::Test

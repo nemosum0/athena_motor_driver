@@ -177,29 +177,55 @@ void MotorController::computeMotorCommands( MotorCommCommand &left_command,
   }
 }
 
-void MotorController::sendReceiveBus( std::shared_ptr<MotorComm> &comm, int &reset_skip_count,
-                                      const MotorCommCommand &left_command,
-                                      const MotorCommCommand &right_command, bool bus_working,
-                                      bool is_front )
+void MotorController::sendReceiveBothBuses( bool front_working, bool rear_working )
 {
-  MotorCommStatus left_status;
-  MotorCommStatus right_status;
-  if ( bus_working || ++reset_skip_count > MAX_RESET_SKIP_COUNT ) {
-    // When communication fails, skip commands for a few cycles so if motor comm is
-    // misaligned it has time to recover
-    reset_skip_count = 0;
-    comm->sendReceive( left_command, right_command, left_status, right_status );
-  } else {
-    comm->resetComm();
-  }
+  bool front_active = front_working || ++reset_skip_count_front_ > MAX_RESET_SKIP_COUNT;
+  bool rear_active = rear_working || ++reset_skip_count_rear_ > MAX_RESET_SKIP_COUNT;
 
-  if ( is_front ) {
-    left_.updateFrontStatus( left_status, 0 );
-    right_.updateFrontStatus( right_status, 1 );
-  } else {
-    left_.updateRearStatus( left_status, 0 );
-    right_.updateRearStatus( right_status, 1 );
-  }
+  if ( front_active )
+    reset_skip_count_front_ = 0;
+  else
+    front_motor_comm_->resetComm();
+
+  if ( rear_active )
+    reset_skip_count_rear_ = 0;
+  else
+    rear_motor_comm_->resetComm();
+
+  MotorCommStatus front_left_status, front_right_status;
+  MotorCommStatus rear_left_status, rear_right_status;
+
+  // Interleaved communication: overlap motor processing time across buses.
+  // Both buses use independent serial lines, so TX/RX can overlap.
+
+  // Phase 1: Send left motor command on both buses
+  if ( front_active )
+    front_motor_comm_->sendCommand( left_command_ );
+  if ( rear_active )
+    rear_motor_comm_->sendCommand( left_command_ );
+
+  // Phase 2: Read left motor responses (motor was processing during the other bus's TX)
+  if ( front_active )
+    front_left_status = front_motor_comm_->receiveStatus();
+  if ( rear_active )
+    rear_left_status = rear_motor_comm_->receiveStatus();
+
+  // Phase 3: Send right motor command on both buses
+  if ( front_active )
+    front_motor_comm_->sendCommand( right_command_ );
+  if ( rear_active )
+    rear_motor_comm_->sendCommand( right_command_ );
+
+  // Phase 4: Read right motor responses
+  if ( front_active )
+    front_right_status = front_motor_comm_->receiveStatus();
+  if ( rear_active )
+    rear_right_status = rear_motor_comm_->receiveStatus();
+
+  left_.updateFrontStatus( front_left_status, 0 );
+  right_.updateFrontStatus( front_right_status, 1 );
+  left_.updateRearStatus( rear_left_status, 0 );
+  right_.updateRearStatus( rear_right_status, 1 );
 }
 
 void MotorController::tryInitializePosition()
@@ -263,8 +289,8 @@ const FullMotorStatus &MotorController::update()
 {
   debug_data_.error = MotorDebugData::Error::NO_ERROR;
 
-  // Cap dt to 30 ms to avoid large jumps after long delays
-  const float dt = std::min<float>( float( time_since_last_command_ ) / 1E6f, 0.030f );
+  // Cap dt to 20 ms to prevent observer divergence after loop pauses (e.g. E-stop)
+  const float dt = std::min<float>( float( time_since_last_command_ ) / 1E6f, 0.020f );
   time_since_last_command_ = 0;
 
   const bool front_working =
@@ -273,10 +299,7 @@ const FullMotorStatus &MotorController::update()
       left_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS || right_.rearAgeMs() < MOTOR_STATUS_TIMEOUT_MS;
 
   // 1. Actuate and Sense (Send previous block's command, get newest feedback)
-  sendReceiveBus( front_motor_comm_, reset_skip_count_front_, left_command_, right_command_,
-                  front_working, true );
-  sendReceiveBus( rear_motor_comm_, reset_skip_count_rear_, left_command_, right_command_,
-                  rear_working, false );
+  sendReceiveBothBuses( front_working, rear_working );
 
   // 2. Filter and Update state
   // Using newest measurements and the torque that just finished physical application

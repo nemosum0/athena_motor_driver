@@ -88,7 +88,7 @@ MotorComm::MotorComm( HardwareSerialIMXRT *serial, int direction_pin, MotorType 
   kw_scale_ = KW_SCALE / ( gear_ratio * gear_ratio );
 }
 
-void MotorComm::sendReceive( const MotorCommCommand &command, MotorCommStatus &status )
+void MotorComm::sendCommand( const MotorCommCommand &command )
 {
   MasterComdDataV3 data;
   memset( &data, 0, sizeof( data ) );
@@ -107,16 +107,25 @@ void MotorComm::sendReceive( const MotorCommCommand &command, MotorCommStatus &s
   data.CRCdata.u32 = crc32_core( (uint32_t *)&data, sizeof( data ) / sizeof( uint32_t ) - 1 );
   serial_->clear();
   writeData( (uint8_t *)&data, sizeof( MasterComdDataV3 ) );
-  status = readStatus();
+}
+
+MotorCommStatus MotorComm::receiveStatus() { return readStatus(); }
+
+void MotorComm::sendReceive( const MotorCommCommand &command, MotorCommStatus &status )
+{
+  sendCommand( command );
+  status = receiveStatus();
 }
 
 void MotorComm::sendReceive( const MotorCommCommand &left_command,
                              const MotorCommCommand &right_command, MotorCommStatus &left_status,
                              MotorCommStatus &right_status )
 {
-  sendReceive( left_command, left_status );
+  sendCommand( left_command );
+  left_status = receiveStatus();
   delayMicroseconds( INTER_MOTOR_DELAY_US );
-  sendReceive( right_command, right_status );
+  sendCommand( right_command );
+  right_status = receiveStatus();
 }
 
 MotorCommStatus MotorComm::readStatus()
