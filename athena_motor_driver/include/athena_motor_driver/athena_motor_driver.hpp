@@ -63,6 +63,7 @@ private:
   std::string port_name_ = "/dev/tty_drive_motor_controller";
   int baud_rate_ = 115200;
   double wheel_radius_ = 0.07;
+  double angular_velocity_limit_ = 0.06;
   LadrcGains left_ladrc_gains_;
   LadrcGains right_ladrc_gains_;
   bool ladrc_updated_ = false;

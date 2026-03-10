@@ -23,6 +23,9 @@ AthenaMotorDriver::AthenaMotorDriver( const rclcpp::NodeOptions &options )
   // Declare serial parameters
   declare_readonly_parameter( "port_name", port_name_, "Serial port name" );
   declare_readonly_parameter( "baud_rate", baud_rate_, "Serial baud rate" );
+  declare_reconfigurable_parameter( "angular_velocity_limit", std::ref( angular_velocity_limit_ ),
+                                    "Limit for commanded angular velocity (rad/s)",
+                                    hector::ParameterOptions<double>().setRange( 0.0, 0.2, 0.001 ) );
   declare_reconfigurable_parameter(
       "controller", std::ref( controller_type_ ), "Controller type",
       hector::ParameterOptions<std::string>()
@@ -139,8 +142,14 @@ void AthenaMotorDriver::update()
     } else if ( twist_msg_ ) {
       is_moving_ = true;
       const double direction_sign = invert_forward_direction_ ? -1.0 : 1.0;
-      MotorCommand command = controller_->computeMotorCommand( direction_sign * twist_msg_->linear.x,
-                                                               twist_msg_->angular.z );
+      double angular = twist_msg_->angular.z;
+      double linear = twist_msg_->linear.x;
+      if ( std::abs( angular ) > angular_velocity_limit_ ) {
+        RCLCPP_DEBUG( get_logger(), "Commanded angular velocity exceeds limit." );
+        angular = std::copysign( angular_velocity_limit_, angular );
+        linear *= angular / twist_msg_->angular.z; // Scale linear velocity to maintain curvature
+      }
+      MotorCommand command = controller_->computeMotorCommand( direction_sign * linear, angular );
       RCLCPP_DEBUG( get_logger(), "Sending velocities: %f, %f", command.left, command.right );
       result = cross_talker_->sendObject( command );
     }

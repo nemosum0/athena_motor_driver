@@ -5,7 +5,7 @@
     wheel_separation: 1.248
     rotational_amplification: 4.0
     wheel_radius: 0.075
-    limit_angular_velocity: 0.06
+    angular_velocity_limit: 0.06
     
     # LADRC Parameters
     # b0: System gain (acceleration per unit torque)
