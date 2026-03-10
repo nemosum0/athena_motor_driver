@@ -3,6 +3,9 @@ float32 v_ref
 float32 p_hold
 bool is_position_hold
 
+# Read motor position from filter
+float32 pos_meas
+
 # Estimated states from ESO
 float32 x1_hat
 float32 x2_hat

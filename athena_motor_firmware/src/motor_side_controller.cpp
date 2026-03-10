@@ -2,6 +2,8 @@
 #include "config.h"
 #include "motor_comm.h"
 
+#include <cmath>
+
 static MotorStatus toMotorStatus( const MotorCommStatus &status )
 {
   MotorStatus result;
@@ -70,6 +72,17 @@ void MotorSideController::initializePosition() { ladrc_.reset(); }
 
 void MotorSideController::updateObserver( float dt )
 {
+  // Re-center position near zero to prevent float32 precision loss
+  // during prolonged rotation. Shifts both filter and observer by the
+  // same offset so all relative differences are preserved.
+  static constexpr float RECENTER_THRESHOLD =
+      POSITION_UPPER_END - POSITION_LOWER_END; // ~one full encoder range
+  const float pos = position_filter_.getFiltered();
+  if ( std::abs( pos ) > RECENTER_THRESHOLD ) {
+    position_filter_.recenter( pos );
+    ladrc_.recenterPosition( pos );
+  }
+
   const float measured_position = position_filter_.getFiltered();
   float measured_torque = 0.0f;
   int valid_count = 0;
@@ -89,7 +102,7 @@ void MotorSideController::updateObserver( float dt )
 
 float MotorSideController::computeTorque( float target_velocity, float dt )
 {
-  return ladrc_.computeControlLaw( target_velocity, dt );
+  return static_cast<float>( ladrc_.computeControlLaw( target_velocity, dt ) );
 }
 
 void MotorSideController::setAppliedTorque( float torque ) { ladrc_.setAppliedTorque( torque ); }

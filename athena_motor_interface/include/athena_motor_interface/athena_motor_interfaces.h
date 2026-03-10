@@ -146,6 +146,7 @@ struct LadrcDebugData {
   float v_ref = 0.f;
   float p_hold = 0.f;
   bool is_position_hold = false;
+  float pos_meas = 0.f;
   float x1_hat = 0.f;
   float x2_hat = 0.f;
   float x3_hat = 0.f;
@@ -159,9 +160,9 @@ struct LadrcDebugData {
 };
 
 REFL_AUTO( type( LadrcDebugData, crosstalk::id( 9 ) ), field( v_ref ), field( p_hold ),
-           field( is_position_hold ), field( x1_hat ), field( x2_hat ), field( x3_hat ),
-           field( tau_raw ), field( tau_ff ), field( tau_aug ), field( tau_safe ), field( output ),
-           field( slip_holdoff_counter ), field( dt ) )
+           field( pos_meas ), field( is_position_hold ), field( x1_hat ), field( x2_hat ),
+           field( x3_hat ), field( tau_raw ), field( tau_ff ), field( tau_aug ), field( tau_safe ),
+           field( output ), field( slip_holdoff_counter ), field( dt ) )
 
 struct MotorStatusDebugData {
   float freq_front_left = 0;

@@ -19,47 +19,81 @@ void LadrcController::reset()
   zero_v_ticks_ = 0;
   breakaway_counter_ = 0;
   slip_holdoff_counter_ = 0;
-  prev_torque_meas_ = 0.0;
+  torque_meas_prev_ = 0.0;
   last_pos_meas_ = 0.0;
   last_torque_meas_ = 0.0;
-  first_compute_ = true;
+  observer_initialized_ = false;
+  init_counter_ = 0;
   last_output_ = 0.0;
   debug_data_ = LadrcDebugData();
 }
 
 void LadrcController::updateObserver( double pos_meas, double torque_meas, double dt )
 {
-  if ( first_compute_ ) {
+  if ( !observer_initialized_ ) {
     x1_hat_ = pos_meas;
-    prev_torque_meas_ = torque_meas;
-    first_compute_ = false;
+    torque_meas_prev_ = torque_meas;
+    observer_initialized_ = true;
+    init_counter_ = 0;
     return;
   }
 
-  // 1. Extended State Observer (ESO) Update - Forward Euler
-  double beta1 = 3.0 * config_.omega_o;
-  double beta2 = 3.0 * config_.omega_o * config_.omega_o;
-  double beta3 = config_.omega_o * config_.omega_o * config_.omega_o;
+  // 1. Extended State Observer (ESO) Update - Tustin (Bilinear) discretization
+  //    of 3rd-order ESO with bandwidth-parameterized gains (Gao, 2003)
+  const double beta1 = 3.0 * config_.omega_o;
+  const double beta2 = 3.0 * config_.omega_o * config_.omega_o;
+  const double beta3 = config_.omega_o * config_.omega_o * config_.omega_o;
 
-  double e_obs = pos_meas - x1_hat_;
-  x1_hat_ += dt * ( x2_hat_ + beta1 * e_obs );
-  x2_hat_ += dt * ( x3_hat_ + config_.b0 * u_prev_ + beta2 * e_obs );
-  x3_hat_ += dt * ( beta3 * e_obs );
+  // Warmup phase: Only track position, keep velocity/disturbance at zero
+  if ( init_counter_ < OBSERVER_WARMUP_TICKS ) {
+    x1_hat_ = pos_meas;
+    x2_hat_ = 0.0;
+    x3_hat_ = 0.0;
+    init_counter_++;
+  } else {
+    const double T = dt / 2.0;
+    const double T2 = T * T;
+    const double T3 = T2 * T;
+
+    const double K = T * beta1 + T2 * beta2 + T3 * beta3;
+
+    const double y_k = last_pos_meas_;
+    const double y_next = pos_meas;
+
+    const double e_k = y_k - x1_hat_;
+
+    const double x1_next = ( ( 1.0 - K ) * x1_hat_ + K * ( y_k + y_next ) + 2.0 * T * x2_hat_ +
+                             2.0 * T2 * x3_hat_ + 2.0 * T2 * config_.b0 * u_prev_ ) /
+                           ( 1.0 + K );
+
+    const double e_next = y_next - x1_next;
+    const double sum_e = e_k + e_next;
+
+    const double x2_next = x2_hat_ + 2.0 * T * x3_hat_ + 2.0 * T * config_.b0 * u_prev_ +
+                           ( T * beta2 + T2 * beta3 ) * sum_e;
+
+    const double x3_next = x3_hat_ + T * beta3 * sum_e;
+
+    x1_hat_ = x1_next;
+    x2_hat_ = x2_next;
+    x3_hat_ = x3_next;
+  }
 
   last_pos_meas_ = pos_meas;
   last_torque_meas_ = torque_meas;
 
   // Populate debug data with observer states
+  debug_data_.pos_meas = pos_meas;
   debug_data_.x1_hat = x1_hat_;
   debug_data_.x2_hat = x2_hat_;
   debug_data_.x3_hat = x3_hat_;
   debug_data_.dt = dt;
 }
 
-float LadrcController::computeControlLaw( double v_ref, double dt )
+double LadrcController::computeControlLaw( double v_ref, double dt )
 {
-  if ( first_compute_ ) {
-    return 0.0f; // Observer must be initialized first
+  if ( !observer_initialized_ || init_counter_ < OBSERVER_WARMUP_TICKS ) {
+    return 0.0;
   }
 
   // 2. Mode select & Control Law
@@ -80,31 +114,31 @@ float LadrcController::computeControlLaw( double v_ref, double dt )
   }
 
   if ( is_position_hold_ ) {
-    double kp_vel = 2.0 * config_.omega_c;
+    const double kp_vel = config_.kd_pos * config_.omega_c;
     tau_raw = ( kp_vel * ( 0.0 - x2_hat_ ) + config_.kp_pos * ( p_hold_ - x1_hat_ ) - x3_hat_ ) /
               config_.b0;
   } else {
-    double kp = config_.omega_c;
-    tau_raw = ( kp * ( v_ref - x2_hat_ ) - x3_hat_ ) / config_.b0;
+    tau_raw = ( config_.omega_c * ( v_ref - x2_hat_ ) - x3_hat_ ) / config_.b0;
   }
 
   // 3. Feedforward Augmentation
   double tau_ff = 0.0;
+  const double direction = v_ref > 0 ? 1.0 : -1.0;
   if ( std::abs( v_ref ) > config_.velocity_dead_zone ) {
-    tau_ff += config_.f_c * ( v_ref > 0 ? 1.0 : -1.0 );
+    tau_ff += config_.f_c * direction;
   }
 
   if ( breakaway_counter_ > 0 ) {
-    tau_ff += 0.8 * config_.f_s * ( v_ref > 0 ? 1.0 : -1.0 );
+    tau_ff += config_.breakaway_fraction * config_.f_s * direction;
     breakaway_counter_--;
   }
 
-  double tau_aug = tau_raw + tau_ff;
+  const double tau_aug = tau_raw + tau_ff;
 
   // 4. Slip Detection and Response
-  double delta_tau = last_torque_meas_ - prev_torque_meas_;
-  double vel_error = std::abs( x2_hat_ - v_ref );
-  prev_torque_meas_ = last_torque_meas_;
+  const double delta_tau = last_torque_meas_ - torque_meas_prev_;
+  const double vel_error = std::abs( x2_hat_ - v_ref );
+  torque_meas_prev_ = last_torque_meas_;
 
   if ( delta_tau < -config_.slip_torque_threshold && vel_error > config_.slip_vel_threshold ) {
     slip_holdoff_counter_ = config_.slip_holdoff_ticks;
@@ -116,19 +150,8 @@ float LadrcController::computeControlLaw( double v_ref, double dt )
     slip_holdoff_counter_--;
   }
 
-  // 5. Output Conditioning
-  double max_delta_tau = config_.max_torque_change * dt;
-  double output = tau_safe;
-
-  // Apply rate limiter, optionally bypassing during breakaway
-  if ( breakaway_counter_ == 0 ) {
-    output = constrain( output, last_output_ - max_delta_tau, last_output_ + max_delta_tau );
-  }
-
-  // Dead-band compensation (if any) could go here.
-
-  // Saturation
-  output = constrain( output, -config_.max_torque, config_.max_torque );
+  // 5. Output Conditioning — saturation only; rate limiting is handled by MotorController
+  const double output = constrain( tau_safe, -config_.max_torque, config_.max_torque );
 
   u_prev_ = output;
   last_output_ = output;
@@ -144,5 +167,5 @@ float LadrcController::computeControlLaw( double v_ref, double dt )
   debug_data_.output = output;
   debug_data_.slip_holdoff_counter = slip_holdoff_counter_;
 
-  return static_cast<float>( output );
+  return output;
 }

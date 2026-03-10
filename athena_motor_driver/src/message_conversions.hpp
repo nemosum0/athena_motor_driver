@@ -14,6 +14,7 @@ inline athena_motor_interface::msg::LadrcDebugData toMsg( const LadrcDebugData &
   athena_motor_interface::msg::LadrcDebugData msg;
   msg.v_ref = ladrc_debug.v_ref;
   msg.p_hold = ladrc_debug.p_hold;
+  msg.pos_meas = ladrc_debug.pos_meas;
   msg.is_position_hold = ladrc_debug.is_position_hold;
   msg.x1_hat = ladrc_debug.x1_hat;
   msg.x2_hat = ladrc_debug.x2_hat;
