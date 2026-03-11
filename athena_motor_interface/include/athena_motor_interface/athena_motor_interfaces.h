@@ -72,12 +72,14 @@ struct LadrcGains {
   float f_s = 1.0f;
   float slip_torque_threshold = 5.0f;
   float slip_vel_threshold = 1.0f;
+  float x3_max = 500.0f;
 
   LadrcGains() = default;
 };
 
 REFL_AUTO( type( LadrcGains ), field( b0 ), field( omega_c ), field( omega_o ), field( kp_pos ),
-           field( f_c ), field( f_s ), field( slip_torque_threshold ), field( slip_vel_threshold ) )
+           field( f_c ), field( f_s ), field( slip_torque_threshold ), field( slip_vel_threshold ),
+           field( x3_max ) )
 
 struct ChangeLadrcGainsCommand {
   LadrcGains left_gains;

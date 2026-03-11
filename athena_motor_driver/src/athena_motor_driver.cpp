@@ -374,6 +374,8 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter( "left_ladrc.slip_vel_threshold",
                                     std::ref( left_ladrc_gains_.slip_vel_threshold ),
                                     "Left LADRC slip velocity threshold", ladrc_options );
+  declare_reconfigurable_parameter( "left_ladrc.x3_max", std::ref( left_ladrc_gains_.x3_max ),
+                                    "Left LADRC max disturbance estimate clamp", ladrc_options );
 
   // Right LADRC parameters
   declare_reconfigurable_parameter( "right_ladrc.b0", std::ref( right_ladrc_gains_.b0 ),
@@ -394,6 +396,8 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter( "right_ladrc.slip_vel_threshold",
                                     std::ref( right_ladrc_gains_.slip_vel_threshold ),
                                     "Right LADRC slip velocity threshold", ladrc_options );
+  declare_reconfigurable_parameter( "right_ladrc.x3_max", std::ref( right_ladrc_gains_.x3_max ),
+                                    "Right LADRC max disturbance estimate clamp", ladrc_options );
 }
 
 } // namespace athena_motor_driver

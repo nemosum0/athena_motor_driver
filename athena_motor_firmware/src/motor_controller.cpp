@@ -29,6 +29,7 @@ void MotorController::setLadrcGains( const LadrcGains &left_gains, const LadrcGa
   l_cfg.f_s = left_gains.f_s;
   l_cfg.slip_torque_threshold = left_gains.slip_torque_threshold;
   l_cfg.slip_vel_threshold = left_gains.slip_vel_threshold;
+  l_cfg.x3_max = left_gains.x3_max;
   left_.setLadrcConfig( l_cfg );
 
   auto r_cfg = right_.getLadrcConfig();
@@ -40,6 +41,7 @@ void MotorController::setLadrcGains( const LadrcGains &left_gains, const LadrcGa
   r_cfg.f_s = right_gains.f_s;
   r_cfg.slip_torque_threshold = right_gains.slip_torque_threshold;
   r_cfg.slip_vel_threshold = right_gains.slip_vel_threshold;
+  r_cfg.x3_max = right_gains.x3_max;
   right_.setLadrcConfig( r_cfg );
 }
 
@@ -135,9 +137,25 @@ MotorController::Torque MotorController::computeTorque( float dt )
   return { left_torque, right_torque };
 }
 
-static void setCommandFromTorque( MotorCommCommand &command, float torque )
+static constexpr float BRAKE_ENTER_TORQUE = 0.2f;
+static constexpr float BRAKE_EXIT_TORQUE = 0.5f;
+
+static void setCommandFromTorque( MotorCommCommand &command, float torque, bool &is_braking )
 {
-  if ( std::abs( torque ) > MotorController::MIN_TORQUE ) {
+  const float abs_torque = std::abs( torque );
+  if ( is_braking ) {
+    // Currently braking — require higher torque to re-enter FOC (hysteresis)
+    if ( abs_torque > BRAKE_EXIT_TORQUE ) {
+      is_braking = false;
+    }
+  } else {
+    // Currently in FOC — enter brake at lower threshold
+    if ( abs_torque <= BRAKE_ENTER_TORQUE ) {
+      is_braking = true;
+    }
+  }
+
+  if ( !is_braking ) {
     command.mode = MotorMode::FOC;
     command.torque = constrain( torque, -MOTOR_TORQUE_LIMIT, MOTOR_TORQUE_LIMIT );
   } else {
@@ -170,8 +188,8 @@ void MotorController::computeMotorCommands( MotorCommCommand &left_command,
     debug_data_.error = MotorDebugData::Error::NO_MOTOR_STATUS;
   } else {
     Torque torque = computeTorque( dt );
-    setCommandFromTorque( left_command, initialized_position_ ? torque.left : 0 );
-    setCommandFromTorque( right_command, initialized_position_ ? torque.right : 0 );
+    setCommandFromTorque( left_command, initialized_position_ ? torque.left : 0, left_braking_ );
+    setCommandFromTorque( right_command, initialized_position_ ? torque.right : 0, right_braking_ );
     left_.setAppliedTorque( left_command.mode == MotorMode::FOC ? left_command.torque : 0 );
     right_.setAppliedTorque( right_command.mode == MotorMode::FOC ? right_command.torque : 0 );
   }

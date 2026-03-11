@@ -17,7 +17,7 @@
     
     left_ladrc.b0: 7.0
     left_ladrc.omega_c: 60.0
-    left_ladrc.omega_o: 300.0
+    left_ladrc.omega_o: 180.0
     left_ladrc.kp_pos: 3.0
     left_ladrc.f_c: 3.1
     left_ladrc.f_s: 2.6
@@ -26,7 +26,7 @@
 
     right_ladrc.b0: 7.0
     right_ladrc.omega_c: 60.0
-    right_ladrc.omega_o: 300.0
+    right_ladrc.omega_o: 180.0
     right_ladrc.kp_pos: 3.0
     right_ladrc.f_c: 3.8
     right_ladrc.f_s: 2.6

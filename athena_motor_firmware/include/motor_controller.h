@@ -86,4 +86,6 @@ private:
 
   MotorCommCommand left_command_;
   MotorCommCommand right_command_;
+  bool left_braking_ = true;
+  bool right_braking_ = true;
 };

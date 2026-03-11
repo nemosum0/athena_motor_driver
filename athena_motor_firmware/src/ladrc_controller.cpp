@@ -24,7 +24,6 @@ void LadrcController::reset()
   last_torque_meas_ = 0.0;
   observer_initialized_ = false;
   init_counter_ = 0;
-  last_output_ = 0.0;
   debug_data_ = LadrcDebugData();
 }
 
@@ -38,7 +37,7 @@ void LadrcController::updateObserver( double pos_meas, double torque_meas, doubl
     return;
   }
 
-  // 1. Extended State Observer (ESO) Update - Tustin (Bilinear) discretization
+  // 1. Extended State Observer (ESO) Update - Forward Euler discretization
   //    of 3rd-order ESO with bandwidth-parameterized gains (Gao, 2003)
   const double beta1 = 3.0 * config_.omega_o;
   const double beta2 = 3.0 * config_.omega_o * config_.omega_o;
@@ -51,32 +50,12 @@ void LadrcController::updateObserver( double pos_meas, double torque_meas, doubl
     x3_hat_ = 0.0;
     init_counter_++;
   } else {
-    const double T = dt / 2.0;
-    const double T2 = T * T;
-    const double T3 = T2 * T;
-
-    const double K = T * beta1 + T2 * beta2 + T3 * beta3;
-
-    const double y_k = last_pos_meas_;
-    const double y_next = pos_meas;
-
-    const double e_k = y_k - x1_hat_;
-
-    const double x1_next = ( ( 1.0 - K ) * x1_hat_ + K * ( y_k + y_next ) + 2.0 * T * x2_hat_ +
-                             2.0 * T2 * x3_hat_ + 2.0 * T2 * config_.b0 * u_prev_ ) /
-                           ( 1.0 + K );
-
-    const double e_next = y_next - x1_next;
-    const double sum_e = e_k + e_next;
-
-    const double x2_next = x2_hat_ + 2.0 * T * x3_hat_ + 2.0 * T * config_.b0 * u_prev_ +
-                           ( T * beta2 + T2 * beta3 ) * sum_e;
-
-    const double x3_next = x3_hat_ + T * beta3 * sum_e;
-
-    x1_hat_ = x1_next;
-    x2_hat_ = x2_next;
-    x3_hat_ = x3_next;
+    // Forward Euler discretization of 3rd-order ESO
+    const double e = pos_meas - x1_hat_;
+    x1_hat_ += dt * ( x2_hat_ + beta1 * e );
+    x2_hat_ += dt * ( x3_hat_ + beta2 * e + config_.b0 * u_prev_ );
+    x3_hat_ += dt * ( beta3 * e );
+    x3_hat_ = std::clamp( x3_hat_, -config_.x3_max, config_.x3_max );
   }
 
   last_pos_meas_ = pos_meas;
@@ -153,8 +132,7 @@ double LadrcController::computeControlLaw( double v_ref, double dt )
   // 5. Output Conditioning — saturation only; rate limiting is handled by MotorController
   const double output = constrain( tau_safe, -config_.max_torque, config_.max_torque );
 
-  u_prev_ = output;
-  last_output_ = output;
+  // u_prev_ is set externally via setAppliedTorque() with the actual applied torque
 
   // Populate debug data
   debug_data_.v_ref = v_ref;

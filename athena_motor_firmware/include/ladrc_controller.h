@@ -7,7 +7,7 @@
 class LadrcController
 {
 public:
-  static constexpr int OBSERVER_WARMUP_TICKS = 10;
+  static constexpr int OBSERVER_WARMUP_TICKS = 50;
 
   struct Config {
     double b0 = 1.0;
@@ -21,6 +21,7 @@ public:
     double max_torque = MOTOR_TORQUE_LIMIT;
     double slip_torque_threshold = 5.0; // Nm per tick
     double slip_vel_threshold = 1.0;    // rad/s
+    double x3_max = 500.0;              // max absolute value for disturbance estimate clamping
     int position_hold_ticks = LADRC_POSITION_HOLD_TICKS;
     int breakaway_ticks = LADRC_BREAKAWAY_TICKS;
     int slip_holdoff_ticks = LADRC_SLIP_HOLDOFF_TICKS;
@@ -86,7 +87,5 @@ private:
   double last_torque_meas_ = 0.0; // torque measurement from previous tick
   bool observer_initialized_ = false;
   int init_counter_ = 0;
-  double last_output_ = 0.0;
-
   LadrcDebugData debug_data_;
 };
