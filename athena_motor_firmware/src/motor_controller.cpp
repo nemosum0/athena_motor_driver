@@ -60,6 +60,12 @@ void MotorController::setVelocityRampLimits( float max_accel_rad_s2, float max_d
   max_deceleration_rad_s2_ = std::clamp( max_decel_rad_s2, k_min, k_max );
 }
 
+void MotorController::setVelocityReferenceJerkLimit( float max_jerk_rad_s3 )
+{
+  constexpr float k_max_jerk = 1.0e6f;
+  max_track_jerk_rad_s3_ = std::clamp( max_jerk_rad_s3, 0.f, k_max_jerk );
+}
+
 void MotorController::stop()
 {
   command_.mode = MotorCommand::MotorMode::BRAKE;
@@ -67,6 +73,8 @@ void MotorController::stop()
   command_.right = 0;
   target_velocity_.left = 0;
   target_velocity_.right = 0;
+  velocity_reference_accel_left_rad_s2_ = 0.f;
+  velocity_reference_accel_right_rad_s2_ = 0.f;
 }
 
 namespace
@@ -92,7 +100,43 @@ float limitTorqueChange( float target_torque, float current_torque, float max_to
   }
   return current_torque + std::copysign( max_torque_change, target_torque - current_torque );
 }
+
+float slewScalarToward( float current, float goal, float max_step )
+{
+  if ( goal > current + max_step )
+    return current + max_step;
+  if ( goal < current - max_step )
+    return current - max_step;
+  return goal;
+}
 } // namespace
+
+void MotorController::updateVelocityReferenceWithLimits( float commanded_velocity_rad_s,
+                                                         float &reference_velocity_rad_s,
+                                                         float &reference_signed_accel_rad_s2,
+                                                         float dt )
+{
+  const float error = commanded_velocity_rad_s - reference_velocity_rad_s;
+  float accel_mag = max_deceleration_rad_s2_;
+  if ( isAccelerating( commanded_velocity_rad_s, reference_velocity_rad_s ) ) {
+    accel_mag = max_acceleration_rad_s2_;
+  }
+  constexpr float k_err_eps = 1e-5f;
+  const float desired_signed_accel =
+      ( std::fabs( error ) < k_err_eps ) ? 0.f : std::copysign( accel_mag, error );
+
+  if ( max_track_jerk_rad_s3_ <= 0.f ) {
+    reference_signed_accel_rad_s2 = desired_signed_accel;
+  } else {
+    const float max_da = max_track_jerk_rad_s3_ * dt;
+    reference_signed_accel_rad_s2 =
+        slewScalarToward( reference_signed_accel_rad_s2, desired_signed_accel, max_da );
+  }
+
+  const float max_dv = std::fabs( reference_signed_accel_rad_s2 ) * dt;
+  reference_velocity_rad_s =
+      limitVelocityChange( commanded_velocity_rad_s, reference_velocity_rad_s, max_dv );
+}
 
 MotorController::Torque MotorController::computeTorque( float dt )
 {
@@ -111,25 +155,19 @@ MotorController::Torque MotorController::computeTorque( float dt )
   }
   target_velocity_.left = command_.left;
   target_velocity_.right = -command_.right;
-  // Limit acceleration
-  // Really simple ramp up and faster ramp down for breaking
-  float acceleration = max_deceleration_rad_s2_;
-  if ( isAccelerating( target_velocity_.left, velocity_.left ) ||
-       isAccelerating( target_velocity_.right, velocity_.right ) ) {
-    acceleration = max_acceleration_rad_s2_;
-  }
 
-  const float max_velocity_change = acceleration * dt;
-
-  velocity_.left = limitVelocityChange( target_velocity_.left, velocity_.left, max_velocity_change );
-  velocity_.right =
-      limitVelocityChange( target_velocity_.right, velocity_.right, max_velocity_change );
+  updateVelocityReferenceWithLimits( target_velocity_.left, velocity_.left,
+                                     velocity_reference_accel_left_rad_s2_, dt );
+  updateVelocityReferenceWithLimits( target_velocity_.right, velocity_.right,
+                                     velocity_reference_accel_right_rad_s2_, dt );
 
   if ( disable_acceleration_limiting_ ) {
     // If acceleration limits are disabled, we just set the target velocity directly
     // This is useful for tuning the PID controller but should not be used in normal operation
     velocity_.left = target_velocity_.left;
     velocity_.right = target_velocity_.right;
+    velocity_reference_accel_left_rad_s2_ = 0.f;
+    velocity_reference_accel_right_rad_s2_ = 0.f;
   }
 
   float left_torque = left_.computeTorque( velocity_.left, dt );
@@ -142,7 +180,7 @@ MotorController::Torque MotorController::computeTorque( float dt )
     right_torque = 0;
   }
 
-  // Detect rotation: wheels moving in opposite directions (or one moving, one still)
+  // Detect rotation: left vs right commanded in opposite directions (or one moving, one still)
   const bool is_rotating = ( velocity_.left * velocity_.right < 0 ) ||
                            ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE &&
                              std::abs( velocity_.right ) < VELOCITY_DEAD_ZONE ) ||
@@ -186,6 +224,8 @@ void MotorController::computeMotorCommands( float dt )
     // At least one motor on each side needs to be working, otherwise we stop
     velocity_.left = 0;
     velocity_.right = 0;
+    velocity_reference_accel_left_rad_s2_ = 0.f;
+    velocity_reference_accel_right_rad_s2_ = 0.f;
     left_command_.mode = MotorMode::BRAKE;
     right_command_.mode = MotorMode::BRAKE;
     // Reset all PID controllers so it will not try to jump back to a position when power is restored

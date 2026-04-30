@@ -150,8 +150,9 @@ void loop()
       }
       app.enable_debug = settings.enable_debug;
       app.motor_controller.setDisableAccelerationLimiting( settings.disable_acceleration_limiting );
-      app.motor_controller.setVelocityRampLimits( settings.max_wheel_acceleration_rad_s2,
-                                                  settings.max_wheel_deceleration_rad_s2 );
+      app.motor_controller.setVelocityRampLimits( settings.max_track_acceleration_rad_s2,
+                                                  settings.max_track_deceleration_rad_s2 );
+      app.motor_controller.setVelocityReferenceJerkLimit( settings.max_track_jerk_rad_s3 );
       app.host_comm.sendObject( AckCommand{ CommandType::UPDATE_SETTINGS } );
       break;
     }

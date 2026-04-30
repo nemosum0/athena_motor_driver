@@ -331,8 +331,9 @@ void AthenaMotorDriver::updateSettings()
   UpdateSettings settings;
   settings.enable_debug = debug_;
   settings.disable_acceleration_limiting = disable_acceleration_limiting_;
-  settings.max_wheel_acceleration_rad_s2 = static_cast<float>( max_wheel_acceleration_rad_s2_ );
-  settings.max_wheel_deceleration_rad_s2 = static_cast<float>( max_wheel_deceleration_rad_s2_ );
+  settings.max_track_acceleration_rad_s2 = static_cast<float>( max_track_acceleration_rad_s2_ );
+  settings.max_track_deceleration_rad_s2 = static_cast<float>( max_track_deceleration_rad_s2_ );
+  settings.max_track_jerk_rad_s3 = static_cast<float>( max_track_jerk_rad_s3_ );
   cross_talker_->sendObject( settings );
 }
 
@@ -364,15 +365,21 @@ void AthenaMotorDriver::declareMicroControllerParameters()
         updateSettings();
       } ) );
   declare_reconfigurable_parameter(
-      "max_wheel_acceleration_rad_s2", std::ref( max_wheel_acceleration_rad_s2_ ),
-      "Firmware VELOCITY ramp: max wheel acceleration (rad/s²)",
+      "max_track_acceleration_rad_s2", std::ref( max_track_acceleration_rad_s2_ ),
+      "Firmware VELOCITY ramp: max track drive acceleration reference (rad/s²)",
       hector::ParameterOptions<double>().setRange( 0.1, 200.0, 0.1 ).onUpdate( [this]( const auto & ) {
         updateSettings();
       } ) );
   declare_reconfigurable_parameter(
-      "max_wheel_deceleration_rad_s2", std::ref( max_wheel_deceleration_rad_s2_ ),
-      "Firmware VELOCITY ramp: max wheel deceleration magnitude (rad/s²)",
+      "max_track_deceleration_rad_s2", std::ref( max_track_deceleration_rad_s2_ ),
+      "Firmware VELOCITY ramp: max track drive deceleration reference magnitude (rad/s²)",
       hector::ParameterOptions<double>().setRange( 0.1, 200.0, 0.1 ).onUpdate( [this]( const auto & ) {
+        updateSettings();
+      } ) );
+  declare_reconfigurable_parameter(
+      "max_track_jerk_rad_s3",
+      std::ref( max_track_jerk_rad_s3_ ), "Firmware VELOCITY ramp: max track drive jerk magnitude on velocity reference (rad/s³); 0 disables",
+      hector::ParameterOptions<double>().setRange( 0.0, 5000.0, 1.0 ).onUpdate( [this]( const auto & ) {
         updateSettings();
       } ) );
   declare_reconfigurable_parameter(

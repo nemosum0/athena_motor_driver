@@ -155,14 +155,16 @@ REFL_AUTO( type( FullMotorStatus, crosstalk::id( 5 ) ), field( front_left ), fie
 struct UpdateSettings {
   bool enable_debug = false;
   bool disable_acceleration_limiting = false;
-  /// Firmware velocity ramp when commanding VELOCITY mode (wheel rad/s²).
-  float max_wheel_acceleration_rad_s2 = 6.0f;
-  float max_wheel_deceleration_rad_s2 = 16.0f;
+  /// Firmware velocity ramp when commanding VELOCITY mode (sprocket / track drive, rad/s²).
+  float max_track_acceleration_rad_s2 = 6.0f;
+  float max_track_deceleration_rad_s2 = 16.0f;
+  /// Cap on |da/dt| for the commanded velocity reference (rad/s³). 0 = unlimited (trapezoidal ramp).
+  float max_track_jerk_rad_s3 = 0.0f;
 };
 
 REFL_AUTO( type( UpdateSettings, crosstalk::id( 6 ) ), field( enable_debug ),
-           field( disable_acceleration_limiting ), field( max_wheel_acceleration_rad_s2 ),
-           field( max_wheel_deceleration_rad_s2 ) )
+           field( disable_acceleration_limiting ), field( max_track_acceleration_rad_s2 ),
+           field( max_track_deceleration_rad_s2 ), field( max_track_jerk_rad_s3 ) )
 
 struct PIDDebugData {
   float goal = std::numeric_limits<float>::quiet_NaN();

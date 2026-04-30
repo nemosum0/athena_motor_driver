@@ -36,6 +36,8 @@ public:
 
   void setVelocityRampLimits( float max_accel_rad_s2, float max_decel_rad_s2 );
 
+  void setVelocityReferenceJerkLimit( float max_jerk_rad_s3 );
+
   void stop();
 
   const FullMotorStatus &update();
@@ -59,6 +61,9 @@ private:
   };
 
   Torque computeTorque( float dt );
+  void updateVelocityReferenceWithLimits( float commanded_velocity_rad_s,
+                                          float &reference_velocity_rad_s,
+                                          float &reference_signed_accel_rad_s2, float dt );
   void computeMotorCommands( float dt );
   void sendReceiveBothBuses( bool front_working, bool rear_working );
   void tryInitializePosition();
@@ -73,9 +78,9 @@ private:
   MotorCommand command_;
   MotorCommCommand left_command_;
   MotorCommCommand right_command_;
-  Velocity target_velocity_;
+  Velocity target_velocity_; // VELOCITY command from host (per track side)
   Torque torque_;
-  Velocity velocity_;
+  Velocity velocity_; // accel/jerk limited reference for PID (not measured sprocket ω)
   elapsedMicros time_since_last_command_ = 0;
 
   RingBuffer<elapsedMillis, STATUS_AGE_BUFFER_SIZE> status_ages_;
@@ -92,6 +97,10 @@ private:
   bool disable_acceleration_limiting_ = false; // For tuning PID controller
   float max_acceleration_rad_s2_ = MAX_ACCELERATION;
   float max_deceleration_rad_s2_ = MAX_DECELERATION;
+  float max_track_jerk_rad_s3_ =
+      0.f; // limit on |da/dt| for the velocity reference (rad/s³); 0 = snap each tick
+  float velocity_reference_accel_left_rad_s2_ = 0.f;
+  float velocity_reference_accel_right_rad_s2_ = 0.f;
   bool initialized_position_ = false;
   float rotational_feed_forward_k_s_left_ = 0.0f;
   float rotational_feed_forward_k_s_right_ = 0.0f;

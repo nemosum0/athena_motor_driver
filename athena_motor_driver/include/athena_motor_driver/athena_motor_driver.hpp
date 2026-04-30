@@ -78,6 +78,9 @@ private:
   bool pid_updated_ = false;
   bool debug_ = false;
   bool disable_acceleration_limiting_ = false;
+  double max_track_acceleration_rad_s2_ = 6.0;
+  double max_track_deceleration_rad_s2_ = 16.0;
+  double max_track_jerk_rad_s3_ = 120.0;
   bool torque_mode_ = false;
   bool is_moving_ = false;
   bool invert_forward_direction_ = false;

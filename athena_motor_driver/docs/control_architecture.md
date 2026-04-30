@@ -134,16 +134,18 @@ preserved (see `update()` in `athena_motor_driver.cpp`).
 - **PID/feed-forward gains**: declared as ROS parameters; whenever any of them
   is reconfigured, `pid_updated_` is set and on the next `update()` tick a
   `ChangePIDGainsCommand` is sent to the Teensy.
-- **`UpdateSettings`**: enables/disables debug data, and the
+- **`UpdateSettings`**: enables/disables debug data, the
   `disable_acceleration_limiting` flag (PID-tuning only — bypasses the velocity
-  ramp on the firmware).
+  reference ramp), plus **`max_track_acceleration_rad_s2`** /
+  **`max_track_deceleration_rad_s2`** /
+  **`max_track_jerk_rad_s3`** (Teensy reference ramp tuning).
 - **`~/reboot` service**: forwards a `TeensyRebootCommand` over Crosstalk and
   closes the serial port; the firmware reboots, which causes USB to re-enumerate.
 - **Status fan-out**: `FullMotorStatus` packets coming back from the Teensy are
   republished on `motor_status`. `MotorDebugData` is republished on `~/debug_data`
   when `enable_debug` is true.
 
-## 3. Firmware-side: from wheel velocity to motor torque
+## 3. Firmware-side: from commanded track angular rate to motor torque
 
 The firmware (`athena_motor_firmware/src/main.cpp`) has two concurrent
 contexts:
@@ -160,7 +162,7 @@ flowchart TD
         L2 -->|MotorCommand| L3["plausibility check<br/>(±30 rad/s, ±60 Nm)"]
         L3 --> L4["motor_controller.setCommand()<br/>time_since_last_command = 0"]
         L2 -->|ChangePIDGainsCommand| L5["MotorController.set*Gains(...)"]
-        L2 -->|UpdateSettings| L6["enable_debug, disable_accel_limit"]
+        L2 -->|UpdateSettings| L6["enable_debug, track accel/decel/jerk, disable_accel_limit"]
         L2 -->|TeensyRebootCommand| L7["ack + SCB_AIRCR reset"]
         L8["host_comm.sendObject(full_motor_status)"]
         L9["if enable_debug: send MotorDebugData"]
