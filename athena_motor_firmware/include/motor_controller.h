@@ -34,6 +34,8 @@ public:
 
   void setDisableAccelerationLimiting( bool disable ) { disable_acceleration_limiting_ = disable; }
 
+  void setVelocityRampLimits( float max_accel_rad_s2, float max_decel_rad_s2 );
+
   void stop();
 
   const FullMotorStatus &update();
@@ -88,6 +90,8 @@ private:
   int reset_skip_count_front_ = 0; // If motor comm fails try to skip communication for a few times
   int reset_skip_count_rear_ = 0;
   bool disable_acceleration_limiting_ = false; // For tuning PID controller
+  float max_acceleration_rad_s2_ = MAX_ACCELERATION;
+  float max_deceleration_rad_s2_ = MAX_DECELERATION;
   bool initialized_position_ = false;
   float rotational_feed_forward_k_s_left_ = 0.0f;
   float rotational_feed_forward_k_s_right_ = 0.0f;

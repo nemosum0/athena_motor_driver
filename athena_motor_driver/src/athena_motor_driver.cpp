@@ -25,7 +25,7 @@ AthenaMotorDriver::AthenaMotorDriver( const rclcpp::NodeOptions &options )
   declare_readonly_parameter( "baud_rate", baud_rate_, "Serial baud rate" );
   declare_reconfigurable_parameter( "angular_velocity_limit", std::ref( angular_velocity_limit_ ),
                                     "Limit for commanded angular velocity (rad/s)",
-                                    hector::ParameterOptions<double>().setRange( 0.0, 0.2, 0.001 ) );
+                                    hector::ParameterOptions<double>().setRange( 0.0, 2.0, 0.01 ) );
   declare_reconfigurable_parameter(
       "controller", std::ref( controller_type_ ), "Controller type",
       hector::ParameterOptions<std::string>()
@@ -331,6 +331,8 @@ void AthenaMotorDriver::updateSettings()
   UpdateSettings settings;
   settings.enable_debug = debug_;
   settings.disable_acceleration_limiting = disable_acceleration_limiting_;
+  settings.max_wheel_acceleration_rad_s2 = static_cast<float>( max_wheel_acceleration_rad_s2_ );
+  settings.max_wheel_deceleration_rad_s2 = static_cast<float>( max_wheel_deceleration_rad_s2_ );
   cross_talker_->sendObject( settings );
 }
 
@@ -359,6 +361,18 @@ void AthenaMotorDriver::declareMicroControllerParameters()
       hector::ParameterOptions<bool>().onUpdate( [this]( const auto &value ) {
         RCLCPP_INFO( get_logger(), "Setting acceleration limiting to: %s",
                      value ? "disabled" : "enabled" );
+        updateSettings();
+      } ) );
+  declare_reconfigurable_parameter(
+      "max_wheel_acceleration_rad_s2", std::ref( max_wheel_acceleration_rad_s2_ ),
+      "Firmware VELOCITY ramp: max wheel acceleration (rad/s²)",
+      hector::ParameterOptions<double>().setRange( 0.1, 200.0, 0.1 ).onUpdate( [this]( const auto & ) {
+        updateSettings();
+      } ) );
+  declare_reconfigurable_parameter(
+      "max_wheel_deceleration_rad_s2", std::ref( max_wheel_deceleration_rad_s2_ ),
+      "Firmware VELOCITY ramp: max wheel deceleration magnitude (rad/s²)",
+      hector::ParameterOptions<double>().setRange( 0.1, 200.0, 0.1 ).onUpdate( [this]( const auto & ) {
         updateSettings();
       } ) );
   declare_reconfigurable_parameter(

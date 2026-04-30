@@ -52,6 +52,14 @@ void MotorController::setRotationalFeedForwardGains( float left_k_s, float right
   rotational_feed_forward_k_s_right_ = right_k_s;
 }
 
+void MotorController::setVelocityRampLimits( float max_accel_rad_s2, float max_decel_rad_s2 )
+{
+  constexpr float k_min = 0.1f;
+  constexpr float k_max = 200.0f;
+  max_acceleration_rad_s2_ = std::clamp( max_accel_rad_s2, k_min, k_max );
+  max_deceleration_rad_s2_ = std::clamp( max_decel_rad_s2, k_min, k_max );
+}
+
 void MotorController::stop()
 {
   command_.mode = MotorCommand::MotorMode::BRAKE;
@@ -105,10 +113,10 @@ MotorController::Torque MotorController::computeTorque( float dt )
   target_velocity_.right = -command_.right;
   // Limit acceleration
   // Really simple ramp up and faster ramp down for breaking
-  float acceleration = MAX_DECELERATION;
+  float acceleration = max_deceleration_rad_s2_;
   if ( isAccelerating( target_velocity_.left, velocity_.left ) ||
        isAccelerating( target_velocity_.right, velocity_.right ) ) {
-    acceleration = MAX_ACCELERATION;
+    acceleration = max_acceleration_rad_s2_;
   }
 
   const float max_velocity_change = acceleration * dt;
