@@ -48,12 +48,13 @@ float PIDController::computeTorque( float goal, float current, float dt )
   const float derivative = dt <= 0 ? 0 : ( error - last_error_ ) / dt;
   float output = 0.0f;
 
+  // Feed-forward control logic
   bool is_stationary = std::abs( current ) < FEED_FORWARD_DEAD_ZONE;
   bool should_move = std::abs( goal ) > FEED_FORWARD_DEAD_ZONE && feed_forward_k_s_ > 0.0f;
-  bool motion_detected = !is_stationary && ( current * goal > 0 );
+  bool is_moving = !is_stationary && ( current * goal > 0 );
 
   bool enter_feed_forward = should_move && is_stationary && !feed_forward_active_;
-  bool exit_feed_forward = feed_forward_active_ && ( !should_move || motion_detected );
+  bool exit_feed_forward = feed_forward_active_ && ( !should_move || is_moving );
 
   if ( enter_feed_forward ) {
     feed_forward_term_ = last_output_;
@@ -65,18 +66,36 @@ float PIDController::computeTorque( float goal, float current, float dt )
     }
   }
 
+  const float max_output_change = max_output_change_ * dt;
+  const float upper_limit = (max_output_ < last_output_ + max_output_change) ? max_output_ : (last_output_ + max_output_change);
+  const float lower_limit = (min_output_ > last_output_ - max_output_change) ? min_output_ : (last_output_ - max_output_change);
+
   if ( feed_forward_active_ ) {
+    // Feed-forward control
     feed_forward_term_ += std::copysign( feed_forward_k_s_, goal ) * dt;
     output = feed_forward_term_;
+    debug_data_.raw_output = output;
   } else {
-    integral_ += error * dt;
-    output = kp_ * error + ki_ * integral_ + kd_ * derivative;
+    // PID control
+    float p_term = kp_ * error;
+    float d_term = kd_ * derivative;
+    
+    // Conditional integration anti-windup
+    float predicted_integral = integral_ + error * dt;
+    float predicted_output = p_term + ki_ * predicted_integral + d_term;
+    
+    bool hitting_upper_limit = predicted_output > upper_limit && error > 0;
+    bool hitting_lower_limit = predicted_output < lower_limit && error < 0;
+    
+    if ( !hitting_upper_limit && !hitting_lower_limit ) {
+      integral_ = predicted_integral;
+    }
+    
+    output = p_term + ki_ * integral_ + d_term;
+    debug_data_.raw_output = output;
   }
-  debug_data_.raw_output = output;
 
-  const float max_output_change = max_output_change_ * dt;
-  output = constrain( output, last_output_ - max_output_change, last_output_ + max_output_change );
-  output = constrain( output, min_output_, max_output_ );
+  output = constrain( output, lower_limit, upper_limit );
 
   last_input_ = current;
   last_error_ = error;
