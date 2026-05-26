@@ -32,18 +32,16 @@ void MotorController::setVelocityPIDGains( const PIDGains &left_pid_gains,
   right_.setVelocityPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d );
 }
 
-void MotorController::setVelocityFeedForwardGains( float left_k_v, float left_k_s, float right_k_v,
-                                                   float right_k_s )
+void MotorController::setVelocityFeedForwardGains( float left_k_s, float right_k_s )
 {
-  left_.setVelocityFeedForwardGains( left_k_v, left_k_s );
-  right_.setVelocityFeedForwardGains( right_k_v, right_k_s );
+  left_.setVelocityFeedForwardGains( left_k_s );
+  right_.setVelocityFeedForwardGains( right_k_s );
 }
 
-void MotorController::setPositionFeedForwardGains( float left_k_v, float left_k_s, float right_k_v,
-                                                   float right_k_s )
+void MotorController::setPositionFeedForwardGains( float left_k_s, float right_k_s )
 {
-  left_.setPositionFeedForwardGains( left_k_v, left_k_s );
-  right_.setPositionFeedForwardGains( right_k_v, right_k_s );
+  left_.setPositionFeedForwardGains( left_k_s );
+  right_.setPositionFeedForwardGains( right_k_s );
 }
 
 void MotorController::setRotationalFeedForwardGains( float left_k_s, float right_k_s )

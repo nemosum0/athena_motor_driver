@@ -110,14 +110,14 @@ void MotorSideController::setVelocityPIDGains( float kp, float ki, float kd )
   velocity_pid_.setGains( kp, ki, kd );
 }
 
-void MotorSideController::setVelocityFeedForwardGains( float k_v, float k_s )
+void MotorSideController::setVelocityFeedForwardGains( float k_s )
 {
-  velocity_pid_.setFeedForwardGains( k_v, k_s );
+  velocity_pid_.setFeedForwardGains( k_s );
 }
 
-void MotorSideController::setPositionFeedForwardGains( float k_v, float k_s )
+void MotorSideController::setPositionFeedForwardGains( float k_s )
 {
-  position_pid_.setFeedForwardGains( k_v, k_s );
+  position_pid_.setFeedForwardGains( k_s );
 }
 
 float MotorSideController::validFrontFreq( long age_ms ) const

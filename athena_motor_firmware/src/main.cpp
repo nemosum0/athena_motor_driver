@@ -131,13 +131,13 @@ void loop()
       app.motor_controller.setPositionPIDGains( command.left_position_pid_gains,
                                                 command.right_position_pid_gains );
       app.motor_controller.setVelocityFeedForwardGains(
-          command.left_velocity_feed_forward_k_v, command.left_velocity_feed_forward_k_s,
-          command.right_velocity_feed_forward_k_v, command.right_velocity_feed_forward_k_s );
+          command.left_velocity_feed_forward_k_s,
+          command.right_velocity_feed_forward_k_s );
       app.motor_controller.setRotationalFeedForwardGains(
           command.left_velocity_feed_forward_k_s_rotational,
           command.right_velocity_feed_forward_k_s_rotational );
 
-      app.motor_controller.setPositionFeedForwardGains( 0.0f, 0.0f, 0.0f, 0.0f );
+      app.motor_controller.setPositionFeedForwardGains( 0.0f, 0.0f );
       app.time_since_last_command = 0;
       app.status_led.speed = StatusLED::FAST;
       app.host_comm.sendObject( AckCommand{ CommandType::CHANGE_PID_GAINS } );

@@ -21,10 +21,8 @@ void PIDController::setOutputLimits( float min_output, float max_output )
   min_output_ = min_output;
   max_output_ = max_output;
 }
-
-void PIDController::setFeedForwardGains( float k_v, float k_s )
+void PIDController::setFeedForwardGains( float k_s )
 {
-  feed_forward_k_v_ = k_v;
   feed_forward_k_s_ = k_s;
 }
 
@@ -34,6 +32,8 @@ void PIDController::reset()
   integral_ = 0;
   last_error_ = 0;
   first_compute_ = true;
+  feed_forward_term_ = 0.0f;
+  feed_forward_active_ = false;
 }
 
 float PIDController::computeTorque( float goal, float current, float dt )
@@ -45,21 +45,34 @@ float PIDController::computeTorque( float goal, float current, float dt )
   }
 
   const float error = goal - current;
-  integral_ += error * dt;
   const float derivative = dt <= 0 ? 0 : ( error - last_error_ ) / dt;
+  float output = 0.0f;
 
-  float output = kp_ * error + ki_ * integral_ + kd_ * derivative;
-  debug_data_.raw_output = output;
+  bool is_stationary = std::abs( current ) < FEED_FORWARD_DEAD_ZONE;
+  bool should_move = std::abs( goal ) > FEED_FORWARD_DEAD_ZONE && feed_forward_k_s_ > 0.0f;
+  bool motion_detected = !is_stationary && ( current * goal > 0 );
 
-  // Feed-forward control: Add physics-based estimate to reduce PID workload and stick-slip effects
-  // Formula: feed_forward = (target_velocity * k_v) + (sign(target_velocity) * k_s)
-  // k_v: Velocity gain - proportional to target velocity
-  // k_s: Static friction gain - constant "push" to overcome static friction (only when velocity != 0)
-  if ( std::abs( goal ) > FEED_FORWARD_DEAD_ZONE ) {
-    float feed_forward = goal * feed_forward_k_v_;
-    feed_forward += std::copysign( feed_forward_k_s_, goal );
-    output += feed_forward;
+  bool enter_feed_forward = should_move && is_stationary && !feed_forward_active_;
+  bool exit_feed_forward = feed_forward_active_ && ( !should_move || motion_detected );
+
+  if ( enter_feed_forward ) {
+    feed_forward_term_ = last_output_;
+    feed_forward_active_ = true;
+  } else if ( exit_feed_forward ) {
+    feed_forward_active_ = false;
+    if ( ki_ != 0.0f ) {
+      integral_ = ( last_output_ - ( kp_ * error + kd_ * derivative ) ) / ki_;
+    }
   }
+
+  if ( feed_forward_active_ ) {
+    feed_forward_term_ += std::copysign( feed_forward_k_s_, goal ) * dt;
+    output = feed_forward_term_;
+  } else {
+    integral_ += error * dt;
+    output = kp_ * error + ki_ * integral_ + kd_ * derivative;
+  }
+  debug_data_.raw_output = output;
 
   const float max_output_change = max_output_change_ * dt;
   output = constrain( output, last_output_ - max_output_change, last_output_ + max_output_change );
