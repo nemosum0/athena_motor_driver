@@ -26,9 +26,11 @@ public:
 
   void setVelocityPIDGains( const PIDGains &left_pid_gains, const PIDGains &right_pid_gains );
 
-  void setVelocityFeedForwardGains( float left_k_s, float right_k_s );
+  void setVelocityFeedForwardParams( float left_gain, float left_offset, float right_gain,
+                                     float right_offset );
 
-  void setPositionFeedForwardGains( float left_k_s, float right_k_s );
+  void setPositionFeedForwardParams( float left_gain, float left_offset, float right_gain,
+                                     float right_offset );
 
   void setRotationalFeedForwardGains( float left_k_s, float right_k_s );
 

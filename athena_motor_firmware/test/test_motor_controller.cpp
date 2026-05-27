@@ -229,7 +229,7 @@ protected:
     PIDGains pos_gains{ 5.0, 0.0, 0.0 };
     controller.setVelocityPIDGains( vel_gains, vel_gains );
     controller.setPositionPIDGains( pos_gains, pos_gains );
-    controller.setVelocityFeedForwardGains( 0.8f, 0.8f );
+    controller.setVelocityFeedForwardParams( 0.8f, 0.0f, 0.8f, 0.0f );
     controller.setRotationalFeedForwardGains( 2.0f, 2.0f );
 
     std::string test_name = ::testing::UnitTest::GetInstance()->current_test_info()->name();

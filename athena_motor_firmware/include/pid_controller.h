@@ -16,7 +16,7 @@ public:
                  float max_output_change );
   void setGains( float kp, float ki, float kd );
   void setOutputLimits( float min_output, float max_output );
-  void setFeedForwardGains( float k_s );
+  void setFeedForwardParams( float gain, float offset = 0.0f );
   void reset();
 
   //! Compute the torque required to reach the goal velocity
@@ -35,13 +35,14 @@ private:
   float last_input_ = 0;
   float last_output_ = 0;
   float integral_ = 0;
+  float filtered_derivative_ = 0;
   float last_error_ = 0;
   bool first_compute_;
-  // Feed-forward control parameters
-  // k_s: Static friction gain - rate of torque increase when stationary (Nm/s)
-  float feed_forward_k_s_ = 0.0f;
+  float feed_forward_gain_ = 0;
+  float feed_forward_offset_ = 0;
+  float derivative_filter_coeff_ = 0.8f;
 
-  float feed_forward_term_ = 0.0f;
+  float feed_forward_term_ = 0;
   bool feed_forward_active_ = false;
 };
 

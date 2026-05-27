@@ -162,10 +162,10 @@ void AthenaMotorDriver::update()
       pid_updated_ = false;
       ChangePIDGainsCommand command( left_velocity_pid_gains_, right_velocity_pid_gains_,
                                      left_position_pid_gains_, right_position_pid_gains_ );
-      command.left_velocity_feed_forward_k_v = left_velocity_feed_forward_k_v_;
-      command.left_velocity_feed_forward_k_s = left_velocity_feed_forward_k_s_;
-      command.right_velocity_feed_forward_k_v = right_velocity_feed_forward_k_v_;
-      command.right_velocity_feed_forward_k_s = right_velocity_feed_forward_k_s_;
+      command.left_velocity_feed_forward_gain = left_velocity_feed_forward_gain_;
+      command.left_velocity_feed_forward_offset = left_velocity_feed_forward_offset_;
+      command.right_velocity_feed_forward_gain = right_velocity_feed_forward_gain_;
+      command.right_velocity_feed_forward_offset = right_velocity_feed_forward_offset_;
       command.left_velocity_feed_forward_k_s_rotational = left_velocity_feed_forward_k_s_rotational_;
       command.right_velocity_feed_forward_k_s_rotational =
           right_velocity_feed_forward_k_s_rotational_;
@@ -185,9 +185,10 @@ void AthenaMotorDriver::update()
         RCLCPP_INFO( get_logger(),
                      "Velocity Feed-Forward:\n  Left: k_v=%f, k_s=%f, k_s_rotational=%f\n  Right: "
                      "k_v=%f, k_s=%f, k_s_rotational=%f",
-                     left_velocity_feed_forward_k_v_, left_velocity_feed_forward_k_s_,
-                     left_velocity_feed_forward_k_s_rotational_, right_velocity_feed_forward_k_v_,
-                     right_velocity_feed_forward_k_s_, right_velocity_feed_forward_k_s_rotational_ );
+                     left_velocity_feed_forward_gain_, left_velocity_feed_forward_offset_,
+                     left_velocity_feed_forward_k_s_rotational_, right_velocity_feed_forward_gain_,
+                     right_velocity_feed_forward_offset_,
+                     right_velocity_feed_forward_k_s_rotational_ );
         RCLCPP_INFO( get_logger(), "You should see 'PID Gains updated.' next, if it worked." );
 
       } else {
@@ -425,18 +426,18 @@ void AthenaMotorDriver::declareMicroControllerParameters()
 
   // Feed-forward control parameters for velocity control
   // Use the same pid_options which includes onUpdate callback that sets pid_updated_ = true
-  declare_reconfigurable_parameter( "left_velocity_feed_forward.k_v",
-                                    std::ref( left_velocity_feed_forward_k_v_ ),
-                                    "Left velocity feed-forward velocity gain", pid_options );
-  declare_reconfigurable_parameter( "left_velocity_feed_forward.k_s",
-                                    std::ref( left_velocity_feed_forward_k_s_ ),
-                                    "Left velocity feed-forward static friction gain", pid_options );
-  declare_reconfigurable_parameter( "right_velocity_feed_forward.k_v",
-                                    std::ref( right_velocity_feed_forward_k_v_ ),
-                                    "Right velocity feed-forward velocity gain", pid_options );
-  declare_reconfigurable_parameter( "right_velocity_feed_forward.k_s",
-                                    std::ref( right_velocity_feed_forward_k_s_ ),
-                                    "Right velocity feed-forward static friction gain", pid_options );
+  declare_reconfigurable_parameter( "left_velocity_feed_forward.gain",
+                                    std::ref( left_velocity_feed_forward_gain_ ),
+                                    "Left velocity feed-forward gain", pid_options );
+  declare_reconfigurable_parameter( "left_velocity_feed_forward.offset",
+                                    std::ref( left_velocity_feed_forward_offset_ ),
+                                    "Left velocity feed-forward offset", pid_options );
+  declare_reconfigurable_parameter( "right_velocity_feed_forward.gain",
+                                    std::ref( right_velocity_feed_forward_gain_ ),
+                                    "Right velocity feed-forward gain", pid_options );
+  declare_reconfigurable_parameter( "right_velocity_feed_forward.offset",
+                                    std::ref( right_velocity_feed_forward_offset_ ),
+                                    "Right velocity feed-forward offset", pid_options );
   declare_reconfigurable_parameter( "left_velocity_feed_forward.k_s_rotational",
                                     std::ref( left_velocity_feed_forward_k_s_rotational_ ),
                                     "Left velocity feed-forward rotational static friction gain",
