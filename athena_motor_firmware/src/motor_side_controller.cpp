@@ -120,6 +120,12 @@ void MotorSideController::setPositionFeedForwardParams( float gain, float offset
   position_pid_.setFeedForwardParams( gain, offset );
 }
 
+void MotorSideController::setDerivativeFilterCutoff( float cutoff_hz, float sample_hz )
+{
+  velocity_pid_.setDerivativeFilterCutoff( cutoff_hz, sample_hz );
+  position_pid_.setDerivativeFilterCutoff( cutoff_hz, sample_hz );
+}
+
 float MotorSideController::validFrontFreq( long age_ms ) const
 {
   if ( age_ms == 0 )

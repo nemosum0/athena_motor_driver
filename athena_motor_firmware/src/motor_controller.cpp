@@ -66,6 +66,12 @@ void MotorController::setVelocityReferenceJerkLimit( float max_jerk_rad_s3 )
   max_track_jerk_rad_s3_ = std::clamp( max_jerk_rad_s3, 0.f, k_max_jerk );
 }
 
+void MotorController::setDerivativeFilterCutoff( float cutoff_hz, float sample_hz )
+{
+  left_.setDerivativeFilterCutoff( cutoff_hz, sample_hz );
+  right_.setDerivativeFilterCutoff( cutoff_hz, sample_hz );
+}
+
 void MotorController::stop()
 {
   command_.mode = MotorCommand::MotorMode::BRAKE;

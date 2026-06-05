@@ -154,6 +154,8 @@ void loop()
       app.motor_controller.setVelocityRampLimits( settings.max_track_acceleration_rad_s2,
                                                   settings.max_track_deceleration_rad_s2 );
       app.motor_controller.setVelocityReferenceJerkLimit( settings.max_track_jerk_rad_s3 );
+      app.motor_controller.setDerivativeFilterCutoff( settings.derivative_filter_cutoff_hz,
+                                                      1000000.0f / MAIN_LOOP_PERIOD_US );
       app.host_comm.sendObject( AckCommand{ CommandType::UPDATE_SETTINGS } );
       break;
     }

@@ -138,7 +138,8 @@ preserved (see `update()` in `athena_motor_driver.cpp`).
   `disable_acceleration_limiting` flag (PID-tuning only — bypasses the velocity
   reference ramp), plus **`max_track_acceleration_rad_s2`** /
   **`max_track_deceleration_rad_s2`** /
-  **`max_track_jerk_rad_s3`** (Teensy reference ramp tuning).
+  **`max_track_jerk_rad_s3`** (Teensy reference ramp tuning) and
+  **`derivative_filter_cutoff_hz`** (PID derivative filter).
 - **`~/reboot` service**: forwards a `TeensyRebootCommand` over Crosstalk and
   closes the serial port; the firmware reboots, which causes USB to re-enumerate.
 - **Status fan-out**: `FullMotorStatus` packets coming back from the Teensy are

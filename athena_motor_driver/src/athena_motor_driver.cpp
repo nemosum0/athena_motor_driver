@@ -335,6 +335,7 @@ void AthenaMotorDriver::updateSettings()
   settings.max_track_acceleration_rad_s2 = static_cast<float>( max_track_acceleration_rad_s2_ );
   settings.max_track_deceleration_rad_s2 = static_cast<float>( max_track_deceleration_rad_s2_ );
   settings.max_track_jerk_rad_s3 = static_cast<float>( max_track_jerk_rad_s3_ );
+  settings.derivative_filter_cutoff_hz = static_cast<float>( derivative_filter_cutoff_hz_ );
   cross_talker_->sendObject( settings );
 }
 
@@ -381,6 +382,12 @@ void AthenaMotorDriver::declareMicroControllerParameters()
       "max_track_jerk_rad_s3",
       std::ref( max_track_jerk_rad_s3_ ), "Firmware VELOCITY ramp: max track drive jerk magnitude on velocity reference (rad/s³); 0 disables",
       hector::ParameterOptions<double>().setRange( 0.0, 5000.0, 1.0 ).onUpdate( [this]( const auto & ) {
+        updateSettings();
+      } ) );
+  declare_reconfigurable_parameter(
+      "derivative_filter_cutoff_hz", std::ref( derivative_filter_cutoff_hz_ ),
+      "Derivative low-pass filter cutoff frequency in Hz. 0 = no filtering.",
+      hector::ParameterOptions<double>().setRange( 0.0, 1000.0, 1.0 ).onUpdate( [this]( const auto & ) {
         updateSettings();
       } ) );
   declare_reconfigurable_parameter(

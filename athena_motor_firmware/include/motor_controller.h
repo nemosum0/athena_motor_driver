@@ -40,6 +40,8 @@ public:
 
   void setVelocityReferenceJerkLimit( float max_jerk_rad_s3 );
 
+  void setDerivativeFilterCutoff( float cutoff_hz, float sample_hz );
+
   void stop();
 
   const FullMotorStatus &update();

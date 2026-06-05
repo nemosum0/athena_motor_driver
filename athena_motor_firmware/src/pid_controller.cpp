@@ -30,6 +30,36 @@ void PIDController::setFeedForwardParams( float gain, float static_offset )
   feed_forward_offset_ = static_offset;
 }
 
+void PIDController::setDerivativeFilterCutoff( float cutoff_hz, float sample_hz )
+{
+  if ( cutoff_hz <= 0.0f || sample_hz <= 0.0f ) {
+    derivative_filter_coeff_ = 0.0f; // No filtering — raw derivative
+    return;
+  }
+
+  // Bilinear-transform (Tustin) discretisation of a first-order low-pass.
+  // This maps the analogue pole at ωc = 2π·cutoff_hz into the z-domain
+  // more accurately than the naive Euler approximation, especially when
+  // cutoff_hz is a non-trivial fraction of sample_hz.
+  //
+  //   H(s) = ωc / (s + ωc)
+  //
+  //   α = (1 - ωc·T/2) / (1 + ωc·T/2)   where T = 1/sample_hz
+  //
+  // α = 0   → no filtering  (cutoff  >> sample rate)
+  // α → 1   → heavy filtering (cutoff << sample rate)
+
+  const float wc = 2.0f * M_PI * cutoff_hz;
+  const float T = 1.0f / sample_hz;
+  derivative_filter_coeff_ = ( 1.0f - wc * T * 0.5f ) / ( 1.0f + wc * T * 0.5f );
+
+  // Clamp: negative alpha would invert the filter (cutoff > Nyquist).
+  // In that case just bypass filtering entirely.
+  if ( derivative_filter_coeff_ < 0.0f ) {
+    derivative_filter_coeff_ = 0.0f;
+  }
+}
+
 void PIDController::reset()
 {
   last_input_ = 0;
@@ -39,6 +69,7 @@ void PIDController::reset()
   feed_forward_term_ = 0.0f;
   feed_forward_active_ = false;
   last_output_ = 0.0f;
+  filtered_derivative_ = 0.0f;
 }
 
 float PIDController::computeTorque( float goal, float current, float dt )
@@ -56,6 +87,9 @@ float PIDController::computeTorque( float goal, float current, float dt )
   const float error = goal - current;
 
   const float raw_derivative = -( current - last_input_ ) / dt;
+  // Low-pass filter on derivative measurement.
+  // derivative_filter_coeff_ = 0.0 means no filtering (raw derivative passes straight through)
+  // derivative_filter_coeff_ approaches 1.0 as cutoff frequency approaches 0 (infinite filtering)
   filtered_derivative_ = derivative_filter_coeff_ * filtered_derivative_ +
                          ( 1.0f - derivative_filter_coeff_ ) * raw_derivative;
   float output = 0.0f;
@@ -102,8 +136,8 @@ float PIDController::computeTorque( float goal, float current, float dt )
     float predicted_integral = integral_ + error * dt;
     float predicted_output = p_term + ki_ * predicted_integral + d_term;
 
-    bool hitting_upper_limit = predicted_output > upper_limit && error > 0;
-    bool hitting_lower_limit = predicted_output < lower_limit && error < 0;
+    bool hitting_upper_limit = predicted_output > max_output_ && error > 0;
+    bool hitting_lower_limit = predicted_output < min_output_ && error < 0;
 
     if ( !hitting_upper_limit && !hitting_lower_limit ) {
       integral_ = predicted_integral;

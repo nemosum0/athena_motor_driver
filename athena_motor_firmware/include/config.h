@@ -29,7 +29,7 @@ static constexpr int REBOOT_DELAY_MS = 10;
 static constexpr float MAX_PLAUSIBLE_TORQUE_COMMAND = 60.0f; // Nm
 static constexpr float MOTOR_TORQUE_LIMIT = 30.0f;           // Nm
 static constexpr float MAX_TORQUE_CHANGE = 150.0f;           // Nm/s
-static constexpr float MIN_TORQUE_FOR_FOC = 0.5f;            // Below this -> BRAKE mode
+static constexpr float MIN_TORQUE_FOR_FOC = 0.1f;            // Below this -> BRAKE mode
 
 // ============================================================
 // Velocity / acceleration limits

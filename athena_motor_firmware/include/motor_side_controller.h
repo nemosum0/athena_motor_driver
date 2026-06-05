@@ -46,6 +46,7 @@ public:
   void setVelocityPIDGains( float kp, float ki, float kd );
   void setVelocityFeedForwardParams( float gain, float offset = 0.0f );
   void setPositionFeedForwardParams( float gain, float offset = 0.0f );
+  void setDerivativeFilterCutoff( float cutoff_hz, float sample_hz );
 
   // --- Accessors ---
   float filteredVelocity() const { return velocity_filter_.getFiltered(); }

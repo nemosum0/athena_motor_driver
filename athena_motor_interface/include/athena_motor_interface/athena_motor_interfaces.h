@@ -157,11 +157,14 @@ struct UpdateSettings {
   float max_track_deceleration_rad_s2 = 16.0f;
   /// Cap on |da/dt| for the commanded velocity reference (rad/s³). 0 = unlimited (trapezoidal ramp).
   float max_track_jerk_rad_s3 = 0.0f;
+  /// Derivative low-pass filter cutoff frequency in Hz. 0 = no filtering.
+  float derivative_filter_cutoff_hz = 0.0f;
 };
 
 REFL_AUTO( type( UpdateSettings, crosstalk::id( 6 ) ), field( enable_debug ),
            field( disable_acceleration_limiting ), field( max_track_acceleration_rad_s2 ),
-           field( max_track_deceleration_rad_s2 ), field( max_track_jerk_rad_s3 ) )
+           field( max_track_deceleration_rad_s2 ), field( max_track_jerk_rad_s3 ),
+           field( derivative_filter_cutoff_hz ) )
 
 struct PIDDebugData {
   float goal = std::numeric_limits<float>::quiet_NaN();
