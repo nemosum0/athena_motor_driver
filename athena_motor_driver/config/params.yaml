@@ -9,12 +9,12 @@
     max_track_acceleration_rad_s2: 6.0
     max_track_deceleration_rad_s2: 16.0
     max_track_jerk_rad_s3: 120.0
-    derivative_filter_cutoff_hz: 1000.0
+    derivative_filter_cutoff_hz: 0.0
     left_velocity_pid.k_p: 10.0
-    left_velocity_pid.k_i: 10.0
+    left_velocity_pid.k_i: 20.0
     left_velocity_pid.k_d: 0.3
     right_velocity_pid.k_p: 10.0
-    right_velocity_pid.k_i: 10.0
+    right_velocity_pid.k_i: 20.0
     right_velocity_pid.k_d: 0.3
     left_position_pid.k_p: 0.0
     left_position_pid.k_i: 0.0
