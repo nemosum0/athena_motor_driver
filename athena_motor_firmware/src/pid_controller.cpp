@@ -90,10 +90,6 @@ float PIDController::computeTorque( float goal, float current, float dt )
                          ( 1.0f - derivative_filter_coeff_ ) * raw_derivative;
   float output = 0.0f;
 
-  const float max_output_change = max_output_change_ * dt;
-  const float upper_limit = std::min( max_output_, last_output_ + max_output_change );
-  const float lower_limit = std::max( min_output_, last_output_ - max_output_change );
-
   // Startup logic
   bool is_stationary = std::abs( current ) < MOTION_THRESHOLD;
   bool should_move = std::abs( goal ) > MOTION_THRESHOLD && startup_gain_ > 0.0f;
@@ -103,9 +99,16 @@ float PIDController::computeTorque( float goal, float current, float dt )
   bool enter_startup = should_move && ( is_stationary || direction_reversed ) && !startup_active_;
   bool exit_startup = startup_active_ && ( !should_move || is_moving );
 
+  const float startup_step = enter_startup ? std::copysign( startup_offset_, goal ) : 0.0f;
+  const float slew_center = last_output_ + startup_step;
+
+  const float max_output_change = max_output_change_ * dt;
+  const float upper_limit = std::min( max_output_, slew_center + max_output_change );
+  const float lower_limit = std::max( min_output_, slew_center - max_output_change );
+
   if ( enter_startup ) {
     // Start moving from rest or reverse direction
-    startup_term_ = last_output_ + std::copysign( startup_offset_, goal );
+    startup_term_ = last_output_ + startup_step;
     startup_active_ = true;
   } else if ( exit_startup ) {
     // Exit startup and transition to PID control
@@ -130,12 +133,16 @@ float PIDController::computeTorque( float goal, float current, float dt )
     float p_term = kp_ * error;
     float d_term = kd_ * filtered_derivative_;
 
-    // Conditional integration anti-windup
+    // Conditional integration anti-windup. Compare against the actually-applicable bounds
+    // (upper_limit/lower_limit), which fold in both the absolute torque limits and the per-tick
+    // slew-rate limit. Using the slew-limited bounds prevents the integrator from winding up
+    // while the output is still rate-limited and unable to track the request (which would
+    // otherwise cause overshoot once the slew catches up).
     float predicted_integral = integral_ + error * dt;
     float predicted_output = p_term + ki_ * predicted_integral + d_term;
 
-    bool hitting_upper_limit = predicted_output > max_output_ && error > 0;
-    bool hitting_lower_limit = predicted_output < min_output_ && error < 0;
+    bool hitting_upper_limit = predicted_output > upper_limit && error > 0;
+    bool hitting_lower_limit = predicted_output < lower_limit && error < 0;
 
     if ( !hitting_upper_limit && !hitting_lower_limit ) {
       integral_ = predicted_integral;

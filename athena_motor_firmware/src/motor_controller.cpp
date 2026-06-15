@@ -173,9 +173,6 @@ MotorController::Torque MotorController::computeTorque( float dt )
     right_torque = 0;
   }
 
-  const float max_torque_change = MAX_TORQUE_CHANGE * dt;
-  left_torque = limitTorqueChange( left_torque, torque_.left, max_torque_change );
-  right_torque = limitTorqueChange( right_torque, torque_.right, max_torque_change );
   torque_.left = left_torque;
   torque_.right = right_torque;
 

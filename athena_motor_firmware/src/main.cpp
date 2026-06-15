@@ -98,9 +98,11 @@ void loop()
             command.left, command.right );
         command.left = command.right = 0;
       }
+      noInterrupts();
       app.motor_controller.setCommand( command );
       app.time_since_last_command = 0;
       app.status_led.speed = StatusLED::FAST;
+      interrupts();
       app.host_comm.sendObject( AckCommand{ CommandType::MOTOR_COMMAND } );
       break;
     }
@@ -123,6 +125,7 @@ void loop()
                      "gain=%.3f, offset=%.3f\n",
                      command.left_velocity_startup_gain, command.left_velocity_startup_offset,
                      command.right_velocity_startup_gain, command.right_velocity_startup_offset );
+      noInterrupts();
       app.motor_controller.setVelocityPIDGains( command.left_velocity_pid_gains,
                                                 command.right_velocity_pid_gains );
       app.motor_controller.setPositionPIDGains( command.left_position_pid_gains,
@@ -133,6 +136,7 @@ void loop()
 
       app.time_since_last_command = 0;
       app.status_led.speed = StatusLED::FAST;
+      interrupts();
       app.host_comm.sendObject( AckCommand{ CommandType::CHANGE_PID_GAINS } );
       break;
     }
@@ -142,12 +146,14 @@ void loop()
         break;
       }
       app.enable_debug = settings.enable_debug;
+      noInterrupts();
       app.motor_controller.setDisableAccelerationLimiting( settings.disable_acceleration_limiting );
       app.motor_controller.setVelocityRampLimits( settings.max_track_acceleration_rad_s2,
                                                   settings.max_track_deceleration_rad_s2 );
       app.motor_controller.setVelocityReferenceJerkLimit( settings.max_track_jerk_rad_s3 );
       app.motor_controller.setDerivativeFilterCutoff( settings.derivative_filter_cutoff_hz,
                                                       1000000.0f / MAIN_LOOP_PERIOD_US );
+      interrupts();
       app.host_comm.sendObject( AckCommand{ CommandType::UPDATE_SETTINGS } );
       break;
     }
@@ -159,16 +165,21 @@ void loop()
       app.host_comm.skip();
   }
 
-  app.host_comm.sendObject( app.full_motor_status );
+ noInterrupts();
+  const FullMotorStatus full_motor_status = app.full_motor_status;
+  interrupts();
+  app.host_comm.sendObject( full_motor_status );
 
-  if ( const auto error = app.motor_controller.getError();
-       error != MotorError::Error::NO_ERROR && error != app.last_error ) {
+  noInterrupts();
+  const auto error = app.motor_controller.getError();
+  interrupts();
+  if ( error != MotorError::Error::NO_ERROR && error != app.last_error ) {
     app.host_comm.sendObject( MotorError{ error } );
     app.last_error = error;
   }
   if ( app.enable_debug ) {
-    auto debug_data = app.motor_controller.debugData();
     noInterrupts();
+    auto debug_data = app.motor_controller.debugData();
     debug_data.average_loop_time_us = app.average_loop_time_filter.getMean();
     interrupts();
     app.host_comm.sendObject( debug_data );

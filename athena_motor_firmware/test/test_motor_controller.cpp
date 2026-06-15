@@ -225,12 +225,11 @@ protected:
     simulated_millis = 0;
 
     // Load params from params.yaml
-    PIDGains vel_gains{ 5.0, 0.0, 0.0 };
-    PIDGains pos_gains{ 5.0, 0.0, 0.0 };
+    PIDGains vel_gains{ 2.0, 6.0, 0.3 };
+    PIDGains pos_gains{ 2.0, 6.0, 0.3 };
     controller.setVelocityPIDGains( vel_gains, vel_gains );
     controller.setPositionPIDGains( pos_gains, pos_gains );
-    controller.setVelocityFeedForwardParams( 0.8f, 0.0f, 0.8f, 0.0f );
-    controller.setRotationalFeedForwardGains( 2.0f, 2.0f );
+    controller.setVelocityStartupParams( 0.8f, 0.0f, 0.8f, 0.0f );
 
     std::string test_name = ::testing::UnitTest::GetInstance()->current_test_info()->name();
     log_file.open( test_name + ".csv" );
