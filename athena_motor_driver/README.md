@@ -46,10 +46,10 @@ The node can be configured via `config/params.yaml`.
 | `wheel_radius`             | double | `0.075`                             | Radius of the wheels in meters.                                         |
 | `rotational_amplification` | double | `6.4`                               | Helper factor for turn-in-place tuning.                                 |
 
-**PID & Feed-Forward Parameters:**
+**PID & Startup Parameters:**
 
 Sets of parameters `k_p`, `k_i`, `k_d` for `left_velocity_pid`, `right_velocity_pid`, `left_position_pid`, `right_position_pid`.
-Sets of parameters `k_v`, `k_s` for `left_velocity_feed_forward`, `right_velocity_feed_forward`.
+Sets of parameters `gain`, `offset` for `left_velocity_startup`, `right_velocity_startup`.
 
 ## Launch
 

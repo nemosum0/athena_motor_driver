@@ -38,7 +38,7 @@ static constexpr float MAX_PLAUSIBLE_VELOCITY_COMMAND = 30.0f; // rad/s
 static constexpr float MAX_ACCELERATION = 6.0f;                // rad/s^2
 static constexpr float MAX_DECELERATION = 16.0f;               // rad/s^2
 static constexpr float VELOCITY_DEAD_ZONE = 0.1f;              // rad/s, below this -> position hold
-static constexpr float FEED_FORWARD_DEAD_ZONE = 0.1f;          // Goal threshold for feed-forward
+static constexpr float MOTION_THRESHOLD = 0.1f;                // Velocity threshold for considering the motor as moving
 
 // ============================================================
 // Communication recovery

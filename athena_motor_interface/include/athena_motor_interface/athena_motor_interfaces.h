@@ -75,24 +75,22 @@ struct PIDGains {
 
 REFL_AUTO( type( PIDGains ), field( k_p ), field( k_i ), field( k_d ) )
 
-struct ChangePIDGainsCommand {
+struct UpdatePIDParamsCommand {
   PIDGains left_velocity_pid_gains;
   PIDGains right_velocity_pid_gains;
   PIDGains left_position_pid_gains;
   PIDGains right_position_pid_gains;
-  float left_velocity_feed_forward_gain = 0.0f;
-  float left_velocity_feed_forward_offset = 0.0f;
-  float right_velocity_feed_forward_gain = 0.0f;
-  float right_velocity_feed_forward_offset = 0.0f;
-  float left_velocity_feed_forward_k_s_rotational = 0.0f;
-  float right_velocity_feed_forward_k_s_rotational = 0.0f;
+  float left_velocity_startup_gain = 0.0f;
+  float left_velocity_startup_offset = 0.0f;
+  float right_velocity_startup_gain = 0.0f;
+  float right_velocity_startup_offset = 0.0f;
 
-  ChangePIDGainsCommand() = default;
+  UpdatePIDParamsCommand() = default;
 
-  ChangePIDGainsCommand( const PIDGains &left_velocity_pid_gains,
-                         const PIDGains &right_velocity_pid_gains,
-                         const PIDGains &left_position_pid_gains,
-                         const PIDGains &right_position_pid_gains )
+  UpdatePIDParamsCommand( const PIDGains &left_velocity_pid_gains,
+                          const PIDGains &right_velocity_pid_gains,
+                          const PIDGains &left_position_pid_gains,
+                          const PIDGains &right_position_pid_gains )
       : left_velocity_pid_gains( left_velocity_pid_gains ),
         right_velocity_pid_gains( right_velocity_pid_gains ),
         left_position_pid_gains( left_position_pid_gains ),
@@ -101,13 +99,11 @@ struct ChangePIDGainsCommand {
   }
 };
 
-REFL_AUTO( type( ChangePIDGainsCommand, crosstalk::id( 3 ) ), field( left_velocity_pid_gains ),
+REFL_AUTO( type( UpdatePIDParamsCommand, crosstalk::id( 3 ) ), field( left_velocity_pid_gains ),
            field( right_velocity_pid_gains ), field( left_position_pid_gains ),
-           field( right_position_pid_gains ), field( left_velocity_feed_forward_gain ),
-           field( left_velocity_feed_forward_offset ), field( right_velocity_feed_forward_gain ),
-           field( right_velocity_feed_forward_offset ),
-           field( left_velocity_feed_forward_k_s_rotational ),
-           field( right_velocity_feed_forward_k_s_rotational ) )
+           field( right_position_pid_gains ), field( left_velocity_startup_gain ),
+           field( left_velocity_startup_offset ), field( right_velocity_startup_gain ),
+           field( right_velocity_startup_offset ) )
 
 struct MotorStatus {
   enum class Error : uint8_t {

@@ -32,24 +32,11 @@ void MotorController::setVelocityPIDGains( const PIDGains &left_pid_gains,
   right_.setVelocityPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d );
 }
 
-void MotorController::setVelocityFeedForwardParams( float left_gain, float left_offset,
-                                                    float right_gain, float right_offset )
+void MotorController::setVelocityStartupParams( float left_gain, float left_offset,
+                                                float right_gain, float right_offset )
 {
-  left_.setVelocityFeedForwardParams( left_gain, left_offset );
-  right_.setVelocityFeedForwardParams( right_gain, right_offset );
-}
-
-void MotorController::setPositionFeedForwardParams( float left_gain, float left_offset,
-                                                    float right_gain, float right_offset )
-{
-  left_.setPositionFeedForwardParams( left_gain, left_offset );
-  right_.setPositionFeedForwardParams( right_gain, right_offset );
-}
-
-void MotorController::setRotationalFeedForwardGains( float left_k_s, float right_k_s )
-{
-  rotational_feed_forward_k_s_left_ = left_k_s;
-  rotational_feed_forward_k_s_right_ = right_k_s;
+  left_.setVelocityStartupParams( left_gain, left_offset );
+  right_.setVelocityStartupParams( right_gain, right_offset );
 }
 
 void MotorController::setVelocityRampLimits( float max_accel_rad_s2, float max_decel_rad_s2 )
@@ -184,20 +171,6 @@ MotorController::Torque MotorController::computeTorque( float dt )
     printer.print( "Invalid torque values detected. This is a bug!" );
     left_torque = 0;
     right_torque = 0;
-  }
-
-  // Detect rotation: left vs right commanded in opposite directions (or one moving, one still)
-  const bool is_rotating = ( velocity_.left * velocity_.right < 0 ) ||
-                           ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE &&
-                             std::abs( velocity_.right ) < VELOCITY_DEAD_ZONE ) ||
-                           ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE &&
-                             std::abs( velocity_.left ) < VELOCITY_DEAD_ZONE );
-
-  if ( is_rotating ) {
-    if ( std::abs( velocity_.left ) > VELOCITY_DEAD_ZONE )
-      left_torque += std::copysign( rotational_feed_forward_k_s_left_, velocity_.left );
-    if ( std::abs( velocity_.right ) > VELOCITY_DEAD_ZONE )
-      right_torque += std::copysign( rotational_feed_forward_k_s_right_, velocity_.right );
   }
 
   const float max_torque_change = MAX_TORQUE_CHANGE * dt;

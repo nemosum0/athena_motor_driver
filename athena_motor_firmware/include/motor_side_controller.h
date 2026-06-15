@@ -44,8 +44,7 @@ public:
   // --- Gain setters ---
   void setPositionPIDGains( float kp, float ki, float kd );
   void setVelocityPIDGains( float kp, float ki, float kd );
-  void setVelocityFeedForwardParams( float gain, float offset = 0.0f );
-  void setPositionFeedForwardParams( float gain, float offset = 0.0f );
+  void setVelocityStartupParams( float gain, float offset = 0.0f );
   void setDerivativeFilterCutoff( float cutoff_hz, float sample_hz );
 
   // --- Accessors ---

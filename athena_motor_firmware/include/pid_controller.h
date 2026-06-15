@@ -16,7 +16,7 @@ public:
                  float max_output_change );
   void setGains( float kp, float ki, float kd );
   void setOutputLimits( float min_output, float max_output );
-  void setFeedForwardParams( float gain, float offset = 0.0f );
+  void setStartupParams( float gain, float offset = 0.0f );
   /**
    * @brief Set derivative low-pass filter cutoff frequency.
    * @param cutoff_hz  Desired -3 dB frequency of the derivative filter in Hz.
@@ -44,12 +44,12 @@ private:
   float filtered_derivative_ = 0;
   float last_error_ = 0;
   bool first_compute_;
-  float feed_forward_gain_ = 0;
-  float feed_forward_offset_ = 0;
+  float startup_gain_ = 0;
+  float startup_offset_ = 0;
   float derivative_filter_coeff_ = 0.0f;
 
-  float feed_forward_term_ = 0;
-  bool feed_forward_active_ = false;
+  float startup_term_ = 0;
+  bool startup_active_ = false;
 };
 
 #endif // ATHENA_MOTOR_FIRMWARE_PID_CONTROLLER_H

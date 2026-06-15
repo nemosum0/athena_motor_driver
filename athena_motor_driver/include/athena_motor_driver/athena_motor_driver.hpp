@@ -68,13 +68,11 @@ private:
   PIDGains right_velocity_pid_gains_;
   PIDGains left_position_pid_gains_;
   PIDGains right_position_pid_gains_;
-  // Feed-forward control parameters for velocity control
-  float left_velocity_feed_forward_gain_ = 0.0f;
-  float left_velocity_feed_forward_offset_ = 0.0f;
-  float right_velocity_feed_forward_gain_ = 0.0f;
-  float right_velocity_feed_forward_offset_ = 0.0f;
-  float left_velocity_feed_forward_k_s_rotational_ = 0.0f;
-  float right_velocity_feed_forward_k_s_rotational_ = 0.0f;
+  // Startup parameters for velocity control
+  float left_velocity_startup_gain_ = 0.0f;
+  float left_velocity_startup_offset_ = 0.0f;
+  float right_velocity_startup_gain_ = 0.0f;
+  float right_velocity_startup_offset_ = 0.0f;
   bool pid_updated_ = false;
   bool debug_ = false;
   bool disable_acceleration_limiting_ = false;

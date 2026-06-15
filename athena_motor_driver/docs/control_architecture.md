@@ -36,8 +36,8 @@ flowchart LR
         FW["main.cpp<br/>host_comm dispatch"] --> MC["MotorController<br/>(velocity ramp, safety)"]
         MC --> MSL["MotorSideController<br/>LEFT"]
         MC --> MSR["MotorSideController<br/>RIGHT"]
-        MSL --> PIDL["PID + Feed-Forward"]
-        MSR --> PIDR["PID + Feed-Forward"]
+        MSL --> PIDL["PID + Startup"]
+        MSR --> PIDR["PID + Startup"]
         PIDL -->|"torque_left [Nm]"| BUS_F
         PIDR -->|"torque_right [Nm]"| BUS_F
         PIDL -->|"torque_left [Nm]"| BUS_R
@@ -62,7 +62,7 @@ flowchart LR
 ```
 
 Key idea: the ROS driver only does kinematics (Twist → per-side wheel rate). All
-real-time control (velocity ramp, PID, feed-forward, position hold, FOC torque
+real-time control (velocity ramp, PID, startup ramp, position hold, FOC torque
 generation) lives on the Teensy because it runs deterministically at 1 kHz.
 
 ## 2. Host-side: from `/cmd_vel` to wheel velocity setpoint
@@ -131,9 +131,9 @@ preserved (see `update()` in `athena_motor_driver.cpp`).
 
 ### 2.3 Other host responsibilities
 
-- **PID/feed-forward gains**: declared as ROS parameters; whenever any of them
+- **PID/startup gains**: declared as ROS parameters; whenever any of them
   is reconfigured, `pid_updated_` is set and on the next `update()` tick a
-  `ChangePIDGainsCommand` is sent to the Teensy.
+  `UpdatePIDParamsCommand` is sent to the Teensy.
 - **`UpdateSettings`**: enables/disables debug data, the
   `disable_acceleration_limiting` flag (PID-tuning only — bypasses the velocity
   reference ramp), plus **`max_track_acceleration_rad_s2`** /
@@ -162,7 +162,7 @@ flowchart TD
         L1["host_comm.processSerialData()"] --> L2{"Object?"}
         L2 -->|MotorCommand| L3["plausibility check<br/>(±30 rad/s, ±60 Nm)"]
         L3 --> L4["motor_controller.setCommand()<br/>time_since_last_command = 0"]
-        L2 -->|ChangePIDGainsCommand| L5["MotorController.set*Gains(...)"]
+        L2 -->|UpdatePIDParamsCommand| L5["MotorController.set*Gains(...)"]
         L2 -->|UpdateSettings| L6["enable_debug, track accel/decel/jerk, disable_accel_limit"]
         L2 -->|TeensyRebootCommand| L7["ack + SCB_AIRCR reset"]
         L8["host_comm.sendObject(full_motor_status)"]
@@ -240,7 +240,7 @@ flowchart TD
     A["computeTorque(dt)"] --> Z{"initialized_position_?"}
     Z -->|no| ZX["return (0, 0)"]
     Z -->|yes| B{"command_.mode?"}
-    B -->|TORQUE| BT["slew-limit each side at MAX_TORQUE_CHANGE = 150 Nm/s<br/>(no PID, no feed-forward)"]
+    B -->|TORQUE| BT["slew-limit each side at MAX_TORQUE_CHANGE = 150 Nm/s<br/>(no PID, no startup ramp)"]
     BT --> BTX["return (torque_left, torque_right)"]
     B -->|BRAKE| BB["return (0, 0)"]
     B -->|VELOCITY| C["target_velocity = (cmd.left, −cmd.right)<br/>(right side sign flipped: opposite mounting)"]
@@ -255,20 +255,16 @@ flowchart TD
     H -->|no| I
     HX --> I
     I --> J["right_torque = MotorSideController(right).computeTorque(velocity.right, dt)"]
-    J --> K{"is_rotating?<br/>(opposite signs or one near zero)"}
     N["slew-limit each torque at MAX_TORQUE_CHANGE"]
-    K -->|yes| L["add ±k_s_rotational<br/>(extra static-friction kick<br/>only when turning in place)"]
-    K -->|no| N
-    L --> N
+    J --> N
     N --> O["return (left_torque, right_torque)"]
 ```
 
 The asymmetric accel/decel limits are intentional: starting up gently keeps
-chains/tracks happy, but stopping needs to be authoritative. The rotational
-feed-forward compensates for the strong static friction that fights yaw on a
-tracked vehicle — it is added *on top of* the per-side velocity feed-forward
-inside the PID, but only when the wheels are actually turning in opposite
-directions or scrubbing.
+chains/tracks happy, but stopping needs to be authoritative. Static friction at
+breakaway is handled per-side inside the PID by the startup ramp (see
+`left_velocity_startup` / `right_velocity_startup`), not by a separate
+torque-stage term.
 
 ### 3.4 `MotorSideController::computeTorque` — position hold ↔ velocity tracking
 
@@ -292,7 +288,7 @@ readings (each side has two motors) through `PositionMeasurementFilter` and
 `VelocityMeasurementFilter`. This gives redundancy: if the front motor on the
 left side drops out, the rear-left reading still drives the controller.
 
-### 3.5 PID + feed-forward kernel
+### 3.5 PID + startup kernel
 
 `PIDController::computeTorque(goal, current, dt)` implements
 
@@ -300,16 +296,25 @@ left side drops out, the rear-left reading still drives the controller.
 u_\text{pid} = k_p \cdot e + k_i \cdot \!\!\int e\, dt + k_d \cdot \dot e,
 \]
 
-where \(e = \text{goal} - \text{current}\). When \(|\text{goal}|\) is above
-`FEED_FORWARD_DEAD_ZONE = 0.1` (rad/s for velocity, rad for position) a
-feed-forward term is added:
+where \(e = \text{goal} - \text{current}\).
+
+When the wheel must break away from rest (or reverse direction) — i.e.
+\(|\text{goal}|\) is above `STARTUP_DEAD_ZONE = 0.1` (rad/s for velocity,
+rad for position), the startup `gain` is positive, and the wheel is not yet
+measured moving in the commanded direction — the kernel temporarily
+**replaces** the PID output with an open-loop startup ramp to overcome static
+friction:
 
 \[
-u_\text{ff} = k_v \cdot \text{goal} + \operatorname{sign}(\text{goal}) \cdot k_s.
+u_\text{startup} \leftarrow u_{t-1} + \operatorname{sign}(\text{goal}) \cdot \text{offset},
+\qquad
+u_\text{startup} \mathrel{+}= \operatorname{sign}(\text{goal}) \cdot \text{gain} \cdot dt.
 \]
 
-`k_v` is a velocity-proportional inverse-plant model term, `k_s` covers
-static friction so the PID does not have to integrate up from zero.
+`offset` (Nm) is a one-time step applied on entry; `gain` (Nm/s) is the ramp
+rate held until the wheel is measured moving in the commanded direction. On
+exit the integrator is seeded so \(k_p e + k_i\!\int + k_d\dot e\) equals the
+last startup output, giving a bumpless hand-off back to the PID.
 
 Output limiting is two-stage:
 
@@ -326,9 +331,11 @@ flowchart LR
     KP --> ADD["Σ"]
     INT --> ADD
     DER --> ADD
-    G -->|"goal outside dead zone"| FF["k_v · goal + sign(goal) · k_s"]
-    FF --> ADD
-    ADD --> SLEW["slew-rate limit<br/>(MAX_TORQUE_CHANGE · dt)"]
+    ADD --> MUX{"startup active?<br/>(breakaway / reversal)"}
+    G -->|"goal outside dead zone"| FF["startup ramp:<br/>u += sign(goal)·gain·dt<br/>(+ sign(goal)·offset on entry)"]
+    FF --> MUX
+    MUX -->|no| SLEW["slew-rate limit<br/>(MAX_TORQUE_CHANGE · dt)"]
+    MUX -->|yes| SLEW
     SLEW --> SAT["saturate<br/>±MOTOR_TORQUE_LIMIT"]
     SAT --> OUT["torque output"]
 ```
@@ -409,6 +416,6 @@ RS-485 bus failure all fail safe instead of leaving the motors driving.
 | Teensy main loop + Crosstalk dispatch | `athena_motor_firmware/src/main.cpp` |
 | Velocity ramp, dual-bus orchestration, mode selection | `athena_motor_firmware/src/motor_controller.cpp` |
 | Per-side position/velocity mode switch + filtering | `athena_motor_firmware/src/motor_side_controller.cpp` |
-| PID + feed-forward kernel | `athena_motor_firmware/src/pid_controller.cpp` |
+| PID + startup kernel | `athena_motor_firmware/src/pid_controller.cpp` |
 | All tunable constants (timeouts, limits, gains) | `athena_motor_firmware/include/config.h` |
 | Default ROS-side gains and kinematics | `athena_motor_driver/config/params.yaml` |

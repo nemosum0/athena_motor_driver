@@ -104,8 +104,8 @@ void loop()
       app.host_comm.sendObject( AckCommand{ CommandType::MOTOR_COMMAND } );
       break;
     }
-    case crosstalk::object_id<ChangePIDGainsCommand>(): {
-      ChangePIDGainsCommand command;
+    case crosstalk::object_id<UpdatePIDParamsCommand>(): {
+      UpdatePIDParamsCommand command;
       if ( app.host_comm.readObject( command ) != crosstalk::ReadResult::Success ) {
         break;
       }
@@ -119,26 +119,18 @@ void loop()
                      command.left_position_pid_gains.k_p, command.left_position_pid_gains.k_i,
                      command.left_position_pid_gains.k_d, command.right_position_pid_gains.k_p,
                      command.right_position_pid_gains.k_i, command.right_position_pid_gains.k_d );
-      Serial.printf(
-          "Received new velocity feed-forward parameters: left gain=%.3f, offset=%.3f, "
-          "kS_rot=%.3f; right "
-          "gain=%.3f, offset=%.3f, kS_rot=%.3f\n",
-          command.left_velocity_feed_forward_gain, command.left_velocity_feed_forward_offset,
-          command.left_velocity_feed_forward_k_s_rotational,
-          command.right_velocity_feed_forward_gain, command.right_velocity_feed_forward_offset,
-          command.right_velocity_feed_forward_k_s_rotational );
+      Serial.printf( "Received new velocity startup parameters: left gain=%.3f, offset=%.3f; right "
+                     "gain=%.3f, offset=%.3f\n",
+                     command.left_velocity_startup_gain, command.left_velocity_startup_offset,
+                     command.right_velocity_startup_gain, command.right_velocity_startup_offset );
       app.motor_controller.setVelocityPIDGains( command.left_velocity_pid_gains,
                                                 command.right_velocity_pid_gains );
       app.motor_controller.setPositionPIDGains( command.left_position_pid_gains,
                                                 command.right_position_pid_gains );
-      app.motor_controller.setVelocityFeedForwardParams(
-          command.left_velocity_feed_forward_gain, command.left_velocity_feed_forward_offset,
-          command.right_velocity_feed_forward_gain, command.right_velocity_feed_forward_offset );
-      app.motor_controller.setRotationalFeedForwardGains(
-          command.left_velocity_feed_forward_k_s_rotational,
-          command.right_velocity_feed_forward_k_s_rotational );
+      app.motor_controller.setVelocityStartupParams(
+          command.left_velocity_startup_gain, command.left_velocity_startup_offset,
+          command.right_velocity_startup_gain, command.right_velocity_startup_offset );
 
-      app.motor_controller.setPositionFeedForwardParams( 0.0f, 0.0f, 0.0f, 0.0f );
       app.time_since_last_command = 0;
       app.status_led.speed = StatusLED::FAST;
       app.host_comm.sendObject( AckCommand{ CommandType::CHANGE_PID_GAINS } );

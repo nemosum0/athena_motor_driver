@@ -26,13 +26,8 @@ public:
 
   void setVelocityPIDGains( const PIDGains &left_pid_gains, const PIDGains &right_pid_gains );
 
-  void setVelocityFeedForwardParams( float left_gain, float left_offset, float right_gain,
+  void setVelocityStartupParams( float left_gain, float left_offset, float right_gain,
                                      float right_offset );
-
-  void setPositionFeedForwardParams( float left_gain, float left_offset, float right_gain,
-                                     float right_offset );
-
-  void setRotationalFeedForwardGains( float left_k_s, float right_k_s );
 
   void setDisableAccelerationLimiting( bool disable ) { disable_acceleration_limiting_ = disable; }
 
@@ -106,6 +101,4 @@ private:
   float velocity_reference_accel_left_rad_s2_ = 0.f;
   float velocity_reference_accel_right_rad_s2_ = 0.f;
   bool initialized_position_ = false;
-  float rotational_feed_forward_k_s_left_ = 0.0f;
-  float rotational_feed_forward_k_s_right_ = 0.0f;
 };
