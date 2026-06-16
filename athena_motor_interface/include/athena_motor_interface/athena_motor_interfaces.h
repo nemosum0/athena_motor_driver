@@ -67,13 +67,17 @@ struct PIDGains {
   float k_p = 0.f;
   float k_i = 0.f;
   float k_d = 0.f;
+  float k_ff = 0.f;
 
   PIDGains() = default;
 
-  PIDGains( float k_p, float k_i, float k_d ) : k_p( k_p ), k_i( k_i ), k_d( k_d ) { }
+  PIDGains( float k_p, float k_i, float k_d, float k_ff = 0.f )
+      : k_p( k_p ), k_i( k_i ), k_d( k_d ), k_ff( k_ff )
+  {
+  }
 };
 
-REFL_AUTO( type( PIDGains ), field( k_p ), field( k_i ), field( k_d ) )
+REFL_AUTO( type( PIDGains ), field( k_p ), field( k_i ), field( k_d ), field( k_ff ) )
 
 struct UpdatePIDParamsCommand {
   PIDGains left_velocity_pid_gains;

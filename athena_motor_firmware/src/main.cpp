@@ -111,16 +111,18 @@ void loop()
       if ( app.host_comm.readObject( command ) != crosstalk::ReadResult::Success ) {
         break;
       }
-      Serial.printf( "Received new velocity PID gains: left kP=%.3f, kI=%.3f, kD=%.3f; right "
-                     "kP=%.3f, kI=%.3f, kD=%.3f\n",
+      Serial.printf( "Received new velocity PID gains: left kP=%.3f, kI=%.3f, kD=%.3f, kFF=%.3f; "
+                     "right kP=%.3f, kI=%.3f, kD=%.3f, kFF=%.3f\n",
                      command.left_velocity_pid_gains.k_p, command.left_velocity_pid_gains.k_i,
-                     command.left_velocity_pid_gains.k_d, command.right_velocity_pid_gains.k_p,
-                     command.right_velocity_pid_gains.k_i, command.right_velocity_pid_gains.k_d );
-      Serial.printf( "Received new position PID gains: left kP=%.3f, kI=%.3f, kD=%.3f; right "
-                     "kP=%.3f, kI=%.3f, kD=%.3f\n",
+                     command.left_velocity_pid_gains.k_d, command.left_velocity_pid_gains.k_ff,
+                     command.right_velocity_pid_gains.k_p, command.right_velocity_pid_gains.k_i,
+                     command.right_velocity_pid_gains.k_d, command.right_velocity_pid_gains.k_ff );
+      Serial.printf( "Received new position PID gains: left kP=%.3f, kI=%.3f, kD=%.3f, kFF=%.3f; "
+                     "right kP=%.3f, kI=%.3f, kD=%.3f, kFF=%.3f\n",
                      command.left_position_pid_gains.k_p, command.left_position_pid_gains.k_i,
-                     command.left_position_pid_gains.k_d, command.right_position_pid_gains.k_p,
-                     command.right_position_pid_gains.k_i, command.right_position_pid_gains.k_d );
+                     command.left_position_pid_gains.k_d, command.left_position_pid_gains.k_ff,
+                     command.right_position_pid_gains.k_p, command.right_position_pid_gains.k_i,
+                     command.right_position_pid_gains.k_d, command.right_position_pid_gains.k_ff );
       Serial.printf( "Received new velocity startup parameters: left gain=%.3f, offset=%.3f; right "
                      "gain=%.3f, offset=%.3f\n",
                      command.left_velocity_startup_gain, command.left_velocity_startup_offset,
@@ -165,7 +167,7 @@ void loop()
       app.host_comm.skip();
   }
 
- noInterrupts();
+  noInterrupts();
   const FullMotorStatus full_motor_status = app.full_motor_status;
   interrupts();
   app.host_comm.sendObject( full_motor_status );

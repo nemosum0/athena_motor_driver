@@ -13,8 +13,8 @@ public:
    *          sudden jumps in torque which can cause mechanical stress and instability.
    */
   PIDController( float kp, float ki, float kd, float min_output, float max_output,
-                 float max_output_change );
-  void setGains( float kp, float ki, float kd );
+                 float max_output_change, float kff = 0.0f );
+  void setGains( float kp, float ki, float kd, float kff = 0.0f );
   void setOutputLimits( float min_output, float max_output );
   void setStartupParams( float gain, float offset = 0.0f );
   /**
@@ -35,6 +35,7 @@ private:
   float kp_;
   float ki_;
   float kd_;
+  float kff_;
   float max_output_;
   float min_output_;
   float max_output_change_;

@@ -4,17 +4,18 @@
 #include <cmath>
 
 PIDController::PIDController( float kp, float ki, float kd, float min_output, float max_output,
-                              float max_output_change )
-    : kp_( kp ), ki_( ki ), kd_( kd ), max_output_( max_output ), min_output_( min_output ),
-      max_output_change_( max_output_change ), first_compute_( true )
+                              float max_output_change, float kff )
+    : kp_( kp ), ki_( ki ), kd_( kd ), kff_( kff ), max_output_( max_output ),
+      min_output_( min_output ), max_output_change_( max_output_change ), first_compute_( true )
 {
 }
 
-void PIDController::setGains( float kp, float ki, float kd )
+void PIDController::setGains( float kp, float ki, float kd, float kff )
 {
   kp_ = kp;
   ki_ = ki;
   kd_ = kd;
+  kff_ = kff;
   integral_ = 0; // Reset integral to avoid sudden jumps when changing gains
 }
 
@@ -116,7 +117,7 @@ float PIDController::computeTorque( float goal, float current, float dt )
 
     if ( ki_ != 0.0f ) {
       // Set integral term to produce the current output to prevent a sudden jump when exiting startup
-      integral_ = ( last_output_ - ( kp_ * error + kd_ * filtered_derivative_ ) ) / ki_;
+      integral_ = ( last_output_ - ( kp_ * error + kd_ * filtered_derivative_ + kff_ * goal ) ) / ki_;
       integral_ = std::clamp( integral_, min_output_ / ki_, max_output_ / ki_ );
     }
   }
@@ -132,14 +133,11 @@ float PIDController::computeTorque( float goal, float current, float dt )
     // PID control
     float p_term = kp_ * error;
     float d_term = kd_ * filtered_derivative_;
+    float ff_term = kff_ * goal;
 
-    // Conditional integration anti-windup. Compare against the actually-applicable bounds
-    // (upper_limit/lower_limit), which fold in both the absolute torque limits and the per-tick
-    // slew-rate limit. Using the slew-limited bounds prevents the integrator from winding up
-    // while the output is still rate-limited and unable to track the request (which would
-    // otherwise cause overshoot once the slew catches up).
+    // Conditional integration anti-windup
     float predicted_integral = integral_ + error * dt;
-    float predicted_output = p_term + ki_ * predicted_integral + d_term;
+    float predicted_output = p_term + ki_ * predicted_integral + d_term + ff_term;
 
     bool hitting_upper_limit = predicted_output > upper_limit && error > 0;
     bool hitting_lower_limit = predicted_output < lower_limit && error < 0;
@@ -148,7 +146,7 @@ float PIDController::computeTorque( float goal, float current, float dt )
       integral_ = predicted_integral;
     }
 
-    output = p_term + ki_ * integral_ + d_term;
+    output = p_term + ki_ * integral_ + d_term + ff_term;
     debug_data_.raw_output = output;
   }
 

@@ -170,15 +170,19 @@ void AthenaMotorDriver::update()
       if ( result == crosstalk::WriteResult::Success ) {
         RCLCPP_INFO( get_logger(), "Sending request to update PID Gains." );
         RCLCPP_INFO( get_logger(),
-                     "Velocity:\n  Left: k_p=%f, K_i=%f, k_d=%f\n  Right: k_p=%f, K_i=%f, k_d=%f",
+                     "Velocity:\n  Left: k_p=%f, K_i=%f, k_d=%f, k_ff=%f\n  Right: k_p=%f, K_i=%f, "
+                     "k_d=%f, k_ff=%f",
                      left_velocity_pid_gains_.k_p, left_velocity_pid_gains_.k_i,
-                     left_velocity_pid_gains_.k_d, right_velocity_pid_gains_.k_p,
-                     right_velocity_pid_gains_.k_i, right_velocity_pid_gains_.k_d );
+                     left_velocity_pid_gains_.k_d, left_velocity_pid_gains_.k_ff,
+                     right_velocity_pid_gains_.k_p, right_velocity_pid_gains_.k_i,
+                     right_velocity_pid_gains_.k_d, right_velocity_pid_gains_.k_ff );
         RCLCPP_INFO( get_logger(),
-                     "Position:\n  Left: k_p=%f, K_i=%f, k_d=%f\n  Right: k_p=%f, K_i=%f, k_d=%f",
+                     "Position:\n  Left: k_p=%f, K_i=%f, k_d=%f, k_ff=%f\n  Right: k_p=%f, K_i=%f, "
+                     "k_d=%f, k_ff=%f",
                      left_position_pid_gains_.k_p, left_position_pid_gains_.k_i,
-                     left_position_pid_gains_.k_d, right_position_pid_gains_.k_p,
-                     right_position_pid_gains_.k_i, right_position_pid_gains_.k_d );
+                     left_position_pid_gains_.k_d, left_position_pid_gains_.k_ff,
+                     right_position_pid_gains_.k_p, right_position_pid_gains_.k_i,
+                     right_position_pid_gains_.k_d, right_position_pid_gains_.k_ff );
         RCLCPP_INFO( get_logger(),
                      "Velocity Startup:\n  Left: gain=%f, offset=%f\n  Right: gain=%f, offset=%f",
                      left_velocity_startup_gain_, left_velocity_startup_offset_,
@@ -399,6 +403,9 @@ void AthenaMotorDriver::declareMicroControllerParameters()
                                     "Left I-Gain", pid_options );
   declare_reconfigurable_parameter( "left_velocity_pid.k_d", std::ref( left_velocity_pid_gains_.k_d ),
                                     "Left D-Gain", pid_options );
+  declare_reconfigurable_parameter( "left_velocity_pid.k_ff",
+                                    std::ref( left_velocity_pid_gains_.k_ff ),
+                                    "Left feed-forward gain (factor on goal)", pid_options );
   declare_reconfigurable_parameter( "right_velocity_pid.k_p",
                                     std::ref( right_velocity_pid_gains_.k_p ), "Right P-Gain",
                                     pid_options );
@@ -408,6 +415,9 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter( "right_velocity_pid.k_d",
                                     std::ref( right_velocity_pid_gains_.k_d ), "Right D-Gain",
                                     pid_options );
+  declare_reconfigurable_parameter( "right_velocity_pid.k_ff",
+                                    std::ref( right_velocity_pid_gains_.k_ff ),
+                                    "Right feed-forward gain (factor on goal)", pid_options );
 
   declare_reconfigurable_parameter( "left_position_pid.k_p", std::ref( left_position_pid_gains_.k_p ),
                                     "Left P-Gain", pid_options );
@@ -415,6 +425,9 @@ void AthenaMotorDriver::declareMicroControllerParameters()
                                     "Left I-Gain", pid_options );
   declare_reconfigurable_parameter( "left_position_pid.k_d", std::ref( left_position_pid_gains_.k_d ),
                                     "Left D-Gain", pid_options );
+  declare_reconfigurable_parameter( "left_position_pid.k_ff",
+                                    std::ref( left_position_pid_gains_.k_ff ),
+                                    "Left feed-forward gain (factor on goal)", pid_options );
   declare_reconfigurable_parameter( "right_position_pid.k_p",
                                     std::ref( right_position_pid_gains_.k_p ), "Right P-Gain",
                                     pid_options );
@@ -424,6 +437,9 @@ void AthenaMotorDriver::declareMicroControllerParameters()
   declare_reconfigurable_parameter( "right_position_pid.k_d",
                                     std::ref( right_position_pid_gains_.k_d ), "Right D-Gain",
                                     pid_options );
+  declare_reconfigurable_parameter( "right_position_pid.k_ff",
+                                    std::ref( right_position_pid_gains_.k_ff ),
+                                    "Right feed-forward gain (factor on goal)", pid_options );
 
   // Startup parameters for velocity control
   // Use the same pid_options which includes onUpdate callback that sets pid_updated_ = true

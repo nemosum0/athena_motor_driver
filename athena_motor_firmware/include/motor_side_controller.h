@@ -42,8 +42,8 @@ public:
   void resetPIDControllers();
 
   // --- Gain setters ---
-  void setPositionPIDGains( float kp, float ki, float kd );
-  void setVelocityPIDGains( float kp, float ki, float kd );
+  void setPositionPIDGains( float kp, float ki, float kd, float kff = 0.0f );
+  void setVelocityPIDGains( float kp, float ki, float kd, float kff = 0.0f );
   void setVelocityStartupParams( float gain, float offset = 0.0f );
   void setDerivativeFilterCutoff( float cutoff_hz, float sample_hz );
 

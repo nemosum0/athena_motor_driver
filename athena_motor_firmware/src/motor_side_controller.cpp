@@ -48,10 +48,14 @@ void MotorSideController::updateStatus( const MotorCommStatus &status, uint8_t e
 }
 
 void MotorSideController::updateFrontStatus( const MotorCommStatus &status, uint8_t expected_motor_id )
-{ updateStatus( status, expected_motor_id, front_status_, front_valid_, front_age_ ); }
+{
+  updateStatus( status, expected_motor_id, front_status_, front_valid_, front_age_ );
+}
 
 void MotorSideController::updateRearStatus( const MotorCommStatus &status, uint8_t expected_motor_id )
-{ updateStatus( status, expected_motor_id, rear_status_, rear_valid_, rear_age_ ); }
+{
+  updateStatus( status, expected_motor_id, rear_status_, rear_valid_, rear_age_ );
+}
 
 void MotorSideController::addMeasurements()
 {
@@ -96,14 +100,20 @@ void MotorSideController::resetPIDControllers()
   position_pid_.reset();
 }
 
-void MotorSideController::setPositionPIDGains( float kp, float ki, float kd )
-{ position_pid_.setGains( kp, ki, kd ); }
+void MotorSideController::setPositionPIDGains( float kp, float ki, float kd, float kff )
+{
+  position_pid_.setGains( kp, ki, kd, kff );
+}
 
-void MotorSideController::setVelocityPIDGains( float kp, float ki, float kd )
-{ velocity_pid_.setGains( kp, ki, kd ); }
+void MotorSideController::setVelocityPIDGains( float kp, float ki, float kd, float kff )
+{
+  velocity_pid_.setGains( kp, ki, kd, kff );
+}
 
 void MotorSideController::setVelocityStartupParams( float gain, float offset )
-{ velocity_pid_.setStartupParams( gain, offset ); }
+{
+  velocity_pid_.setStartupParams( gain, offset );
+}
 
 void MotorSideController::setDerivativeFilterCutoff( float cutoff_hz, float sample_hz )
 {

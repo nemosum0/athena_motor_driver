@@ -166,7 +166,7 @@ TEST_F( PIDControllerTest, StartupRampRespectsMaxOutputChange )
 {
   // Reconfigure with a very strict max output change limit
   PIDController strict_pid( 1.0f, 0.5f, 0.1f, -100.0f, 100.0f, 0.5f ); // 0.5 Nm/s limit
-  strict_pid.setStartupParams( 100.0f );                              // Fast ramp: 100 Nm/s, no offset
+  strict_pid.setStartupParams( 100.0f ); // Fast ramp: 100 Nm/s, no offset
 
   float goal = 1.0f;
   float current = 0.0f;
@@ -182,6 +182,22 @@ TEST_F( PIDControllerTest, StartupRampRespectsMaxOutputChange )
 
   float torque3 = strict_pid.computeTorque( goal, current, dt );
   EXPECT_FLOAT_EQ( torque3, 0.015f );
+}
+
+// Feed-forward term adds kff * goal directly to the PID output
+TEST_F( PIDControllerTest, FeedForwardTermIsAddedToOutput )
+{
+  float kff = 0.3f;
+  pid->setGains( kp, ki, kd, kff );
+
+  float goal = 2.0f;
+  float current = 1.0f; // above MOTION_THRESHOLD, so startup ramp does not engage
+  float dt = 0.01f;
+
+  float torque = pid->computeTorque( goal, current, dt );
+  float error = goal - current;
+  float expected = kp * error + ki * error * dt + kff * goal;
+  EXPECT_FLOAT_EQ( torque, expected );
 }
 
 // The stiction-breaking offset is applied as a step even under a strict slew-rate limit

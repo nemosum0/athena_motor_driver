@@ -21,15 +21,19 @@ void MotorController::setCommand( const MotorCommand &command ) { command_ = com
 void MotorController::setPositionPIDGains( const PIDGains &left_pid_gains,
                                            const PIDGains &right_pid_gains )
 {
-  left_.setPositionPIDGains( left_pid_gains.k_p, left_pid_gains.k_i, left_pid_gains.k_d );
-  right_.setPositionPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d );
+  left_.setPositionPIDGains( left_pid_gains.k_p, left_pid_gains.k_i, left_pid_gains.k_d,
+                             left_pid_gains.k_ff );
+  right_.setPositionPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d,
+                              right_pid_gains.k_ff );
 }
 
 void MotorController::setVelocityPIDGains( const PIDGains &left_pid_gains,
                                            const PIDGains &right_pid_gains )
 {
-  left_.setVelocityPIDGains( left_pid_gains.k_p, left_pid_gains.k_i, left_pid_gains.k_d );
-  right_.setVelocityPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d );
+  left_.setVelocityPIDGains( left_pid_gains.k_p, left_pid_gains.k_i, left_pid_gains.k_d,
+                             left_pid_gains.k_ff );
+  right_.setVelocityPIDGains( right_pid_gains.k_p, right_pid_gains.k_i, right_pid_gains.k_d,
+                              right_pid_gains.k_ff );
 }
 
 void MotorController::setVelocityStartupParams( float left_gain, float left_offset,
