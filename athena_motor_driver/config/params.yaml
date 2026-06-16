@@ -10,14 +10,14 @@
     max_track_deceleration_rad_s2: 16.0
     max_track_jerk_rad_s3: 120.0
     derivative_filter_cutoff_hz: 0.0
-    left_velocity_pid.k_p: 10.0
-    left_velocity_pid.k_i: 20.0
-    left_velocity_pid.k_d: 0.3
-    left_velocity_pid.k_ff: 0.0
-    right_velocity_pid.k_p: 10.0
-    right_velocity_pid.k_i: 20.0
-    right_velocity_pid.k_d: 0.3
-    right_velocity_pid.k_ff: 0.0
+    left_velocity_pid.k_p: 5.0
+    left_velocity_pid.k_i: 10.0
+    left_velocity_pid.k_d: 0.1
+    left_velocity_pid.k_ff: 0.4
+    right_velocity_pid.k_p: 5.0
+    right_velocity_pid.k_i: 10.0
+    right_velocity_pid.k_d: 0.1
+    right_velocity_pid.k_ff: 0.4
     left_position_pid.k_p: 0.0
     left_position_pid.k_i: 0.0
     left_position_pid.k_d: 0.0
@@ -27,7 +27,7 @@
     right_position_pid.k_d: 0.0
     right_position_pid.k_ff: 0.0
     left_velocity_startup.gain: 10.0
-    left_velocity_startup.offset: 50.0
+    left_velocity_startup.offset: 1.0
     right_velocity_startup.gain: 10.0
-    right_velocity_startup.offset: 50.0
+    right_velocity_startup.offset: 1.0
     invert_forward_direction: true
